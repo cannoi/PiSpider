@@ -8,6 +8,7 @@ on:
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/pispider-hybrid-core
+  IMAGE2: ghcr.io/${{ github.repository_owner }}/pispider
 
 jobs:
   build:
@@ -30,3 +31,4 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE2 }}:latest

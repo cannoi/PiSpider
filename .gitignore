@@ -2,5 +2,9 @@ __pycache__/
 *.pyc
 .env
 data/
-*.zip
 .DS_Store
+# Keep the worker pack that Docker copies
+*.zip
+!packs/
+!packs/*.zip
+!packs/windows-worker.zip

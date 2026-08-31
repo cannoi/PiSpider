@@ -118,10 +118,23 @@ def ensure_windows_worker(force_download: bool = False) -> dict:
             src = dest_zip
             source = "cached-zip"
         else:
-            raise RuntimeError("No bundled pack and GitHub URL not set (YOUR_ORG)")
+            src = None
 
-        with zipfile.ZipFile(src) as zf:
-            zf.extractall(dest_dir)
+        bundled_dir = Path("/app/WindowsWorker")
+        if not bundled_dir.is_dir():
+            bundled_dir = Path(__file__).resolve().parent / "WindowsWorker"
+
+        if src and src.is_file():
+            with zipfile.ZipFile(src) as zf:
+                zf.extractall(dest_dir)
+        elif bundled_dir.is_dir() and (bundled_dir / "Activate_Worker.bat").is_file():
+            if dest_dir.resolve() != bundled_dir.resolve():
+                if dest_dir.exists():
+                    shutil.rmtree(dest_dir)
+                shutil.copytree(bundled_dir, dest_dir)
+            source = "image-folder"
+        else:
+            raise RuntimeError("No bundled pack and GitHub URL not set (YOUR_ORG)")
 
         act = dest_dir / "ACTIVATE.txt"
         act.write_text(
