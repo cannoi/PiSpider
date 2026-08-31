@@ -274,6 +274,26 @@ def api_command():
     return jsonify({"ok": True, "command": cmd})
 
 
+@app.post("/api/run")
+def api_run():
+    """Whitelist only: scan|repair|status|patrol|digest|worker."""
+    body = request.get_json(silent=True) or {}
+    script = str(body.get("script") or body.get("action") or "scan").strip().lower()
+    allowed = {"scan", "repair", "status", "patrol", "digest", "worker"}
+    if script not in allowed:
+        return jsonify({"ok": False, "error": "script not allowed"}), 400
+    cmd = {
+        "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S"),
+        "Action": script.upper(),
+        "Script": script,
+        "RequestedAt": now_iso(),
+        "TimeoutSec": 180,
+        "Source": "solohost-run",
+    }
+    write_json(bus_dir() / "command.json", cmd)
+    return jsonify({"ok": True, "command": cmd})
+
+
 @app.post("/api/prepare-pack")
 def api_prepare_pack():
     """Refresh WindowsWorker into SoloHost app root. Does not activate."""

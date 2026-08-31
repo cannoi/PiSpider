@@ -1,5 +1,4 @@
 #Requires -Version 5.1
-# File bus between SoloHost Core and Windows Worker
 function Get-SpiderLiveBusDir {
     $root = $script:SpiderRoot
     if ([string]::IsNullOrWhiteSpace($root)) { $root = $env:PINODE_SPIDER_ROOT }
@@ -43,11 +42,15 @@ function Read-SpiderLiveCommand {
 }
 
 function Clear-SpiderLiveCommand {
-    $path = Join-Path (Get-SpiderLiveBusDir) 'command.json'
-    if (Test-Path -LiteralPath $path) {
-        try { Rename-Item -LiteralPath $path -NewName 'command.last.json' -Force } catch {
-            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
-        }
+    $dir = Get-SpiderLiveBusDir
+    $path = Join-Path $dir 'command.json'
+    $last = Join-Path $dir 'command.last.json'
+    if (-not (Test-Path -LiteralPath $path)) { return }
+    try {
+        if (Test-Path -LiteralPath $last) { Remove-Item -LiteralPath $last -Force -ErrorAction Stop }
+        Move-Item -LiteralPath $path -Destination $last -Force
+    } catch {
+        Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
     }
 }
 

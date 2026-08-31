@@ -27,11 +27,12 @@ Smallest safe repair first. You can stop the Worker any time.</pre>
     <button class="go" onclick="accept()">I AGREE — START</button>
   </div>
   <div id="panel" style="display:none">
-    <button class="go" onclick="cmd('SCAN')">START CARE</button>
+    <button class="go" onclick="run('scan')">SCAN</button>
     <div>
-      <button onclick="cmd('PATROL')">Patrol</button>
-      <button onclick="cmd('DIGEST')">Daily report</button>
-      <button onclick="cmd('REPAIR')">Repair</button>
+      <button onclick="run('repair')">REPAIR</button>
+      <button onclick="run('status')">STATUS</button>
+      <button onclick="run('patrol')">PATROL</button>
+      <button onclick="run('worker')">START WORKER</button>
     </div>
     <div class="sec"><b>NOW / DONE / NEXT</b><pre id="story">...</pre></div>
     <p><a href="/Activate_Worker.bat">Download Activate_Worker.bat</a> (only if Worker stays OFF)</p>
@@ -85,15 +86,16 @@ async function accept(){
   if (!document.getElementById('agree').checked) { alert('Tick the checkbox.'); return; }
   try {
     const r = await api('/api/accept-terms', {method:'POST', body: JSON.stringify({accepted:true})});
-    await api('/api/command', {method:'POST', body: JSON.stringify({action:'SCAN'})});
+    await api('/api/run', {method:'POST', body: JSON.stringify({script:'worker'})});
+    await api('/api/run', {method:'POST', body: JSON.stringify({script:'scan'})});
     alert(r.hint || 'Started. If Worker is OFF, run Activate_Worker.bat once.');
     refresh();
   } catch(e){ document.getElementById('err').textContent = e.message; }
 }
-async function cmd(action){
+async function run(script){
   try {
-    const r = await api('/api/command', {method:'POST', body: JSON.stringify({action})});
-    document.getElementById('err').textContent = r.ok ? ('Sent ' + action) : (r.error||'fail');
+    const r = await api('/api/run', {method:'POST', body: JSON.stringify({script})});
+    document.getElementById('err').textContent = r.ok ? ('Queued ' + script) : (r.error||'fail');
     refresh();
   } catch(e){ document.getElementById('err').textContent = e.message; }
 }
