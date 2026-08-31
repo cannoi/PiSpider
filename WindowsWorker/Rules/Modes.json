@@ -1,0 +1,47 @@
+{
+  "Version": "2.1.5",
+  "Description": "Autonomy modes — what Spider may execute without approval",
+  "Modes": {
+    "OBSERVE": {
+      "Order": 0,
+      "Description": "Chi quan sat, ghi log, khong hanh dong",
+      "MaxAutoRisk": "NONE",
+      "AllowRepair": false,
+      "AllowRecovery": false,
+      "NeedsApprovalFor": ["LOW", "MEDIUM", "HIGH", "EXTREME"]
+    },
+    "ASSIST": {
+      "Order": 1,
+      "Description": "Phat hien + de xuat + Approval Console",
+      "MaxAutoRisk": "NONE",
+      "AllowRepair": false,
+      "AllowRecovery": false,
+      "NeedsApprovalFor": ["LOW", "MEDIUM", "HIGH", "EXTREME"]
+    },
+    "AUTO-SAFE": {
+      "Order": 2,
+      "Description": "Tu thuc hien action Risk=LOW",
+      "MaxAutoRisk": "LOW",
+      "AllowRepair": true,
+      "AllowRecovery": false,
+      "NeedsApprovalFor": ["MEDIUM", "HIGH", "EXTREME"]
+    },
+    "AUTO-RECOVERY": {
+      "Order": 3,
+      "Description": "Cho phep recovery MEDIUM/HIGH theo policy",
+      "MaxAutoRisk": "HIGH",
+      "AllowRepair": true,
+      "AllowRecovery": true,
+      "NeedsApprovalFor": ["HIGH", "EXTREME"]
+    },
+    "EMERGENCY-GUARDIAN": {
+      "Order": 4,
+      "Description": "Uu tien on dinh Node khi mat lien lac — van trong Safety Policy",
+      "MaxAutoRisk": "HIGH",
+      "AllowRepair": true,
+      "AllowRecovery": true,
+      "NeedsApprovalFor": ["EXTREME"],
+      "Notes": "EXTREME (BIOS, major upgrade, reboot) never auto"
+    }
+  }
+}

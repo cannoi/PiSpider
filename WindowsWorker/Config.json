@@ -1,0 +1,219 @@
+{
+  "Version": "2.3.21",
+  "Name": "PiNode Spider",
+  "Codename": "Autonomous + Dashboard (no HTTP Bridge)",
+  "Mode": "ASSIST",
+  "Modes": {
+    "OBSERVE": "Chi quan sat, ghi log, khong hanh dong",
+    "ASSIST": "Phat hien + de xuat + Approval Console",
+    "AUTO-SAFE": "Tu thuc hien action Risk=LOW",
+    "AUTO-RECOVERY": "Cho phep recovery Risk=MEDIUM/HIGH khi rule chac chan",
+    "EMERGENCY-GUARDIAN": "Khi mat lien lac: uu tien giu Node on dinh trong Safety Policy"
+  },
+  "Loops": {
+    "WatchIntervalMinutes": 5,
+    "PatrolHour": 18,
+    "PatrolMinute": 0,
+    "EmergencyWakeOnCritical": true,
+    "DailyReportHour": 19,
+    "DailyReportMinute": 15,
+    "DailyReportWindow": "19:00-20:00"
+  },
+  "Thresholds": {
+    "RAM_Warning": 85,
+    "RAM_Critical": 92,
+    "Disk_Free_GB_Warning": 20,
+    "Disk_Free_GB_Critical": 10,
+    "CPU_Warning": 85,
+    "CPU_Critical": 95,
+    "LedgerAge_Warning_Sec": 30,
+    "LedgerAge_Critical_Sec": 120,
+    "Peers_Min_Warning": 5,
+    "Peers_Min_Critical": 2,
+    "StellarStall_Minutes": 15,
+    "Latency_Warning_Ms": 200,
+    "ContainerRestartCount_Warning": 3
+  },
+  "RiskPolicy": {
+    "LOW": {
+      "AutoIn": [
+        "AUTO-SAFE",
+        "AUTO-RECOVERY",
+        "EMERGENCY-GUARDIAN"
+      ],
+      "NeedsApproval": false
+    },
+    "MEDIUM": {
+      "AutoIn": [
+        "AUTO-RECOVERY",
+        "EMERGENCY-GUARDIAN"
+      ],
+      "NeedsApproval": true
+    },
+    "HIGH": {
+      "AutoIn": [
+        "EMERGENCY-GUARDIAN"
+      ],
+      "NeedsApproval": true
+    },
+    "EXTREME": {
+      "AutoIn": [],
+      "NeedsApproval": true,
+      "NeverAuto": true
+    }
+  },
+  "Failsafe": {
+    "ActionTimeoutSec": 180,
+    "MaxRetry": 1,
+    "CircuitBreakerFailures": 3,
+    "CircuitBreakerCooldownMin": 30,
+    "ApprovalTimeoutSec": 300,
+    "EmergencyNoContactMin": 15
+  },
+  "ProtectedProcesses": [
+    "Pi Desktop",
+    "PiDesktop",
+    "Pi Network",
+    "PiNetwork",
+    "PiNode",
+    "Pi Node",
+    "PiNodeMonitorLive",
+    "DataLive",
+    "DataLive_HttpApi",
+    "Pi_Node_Telegram_Controller",
+    "pinode-telegram-controller",
+    "Controller",
+    "stellar-core",
+    "stellar_core",
+    "Docker Desktop",
+    "DockerDesktop",
+    "com.docker.backend",
+    "com.docker.proxy",
+    "com.docker.service",
+    "dockerd",
+    "containerd",
+    "containerd-shim",
+    "docker-proxy",
+    "vpnkit",
+    "wsl",
+    "wslhost",
+    "wslservice",
+    "vmmem",
+    "vmmemWSL",
+    "LxssManager",
+    "LxssManagerUser",
+    "System",
+    "System Idle Process",
+    "Registry",
+    "smss",
+    "csrss",
+    "wininit",
+    "services",
+    "lsass",
+    "svchost",
+    "winlogon",
+    "dwm",
+    "explorer",
+    "conhost",
+    "RuntimeBroker"
+  ],
+  "CleanupCandidates": [
+    "chrome",
+    "msedge",
+    "firefox",
+    "opera",
+    "brave",
+    "OneDrive",
+    "Teams",
+    "ms-teams",
+    "Discord",
+    "Spotify",
+    "Copilot",
+    "SearchApp",
+    "SearchHost",
+    "SearchIndexer",
+    "Widgets",
+    "PhoneExperienceHost",
+    "YourPhone",
+    "GameBar",
+    "GameBarFTServer",
+    "Xbox",
+    "WebViewHost",
+    "ApplicationFrameHost",
+    "TextInputHost",
+    "TabTip"
+  ],
+  "ProtectedPaths": [
+    "C:\\ProgramData\\Docker",
+    "%LOCALAPPDATA%\\Docker",
+    "%USERPROFILE%\\.docker",
+    "*\\stellar*",
+    "*\\pi-node*",
+    "*\\Pi Network*"
+  ],
+  "PiPorts": [
+    31400,
+    31401,
+    31402,
+    31403,
+    31404,
+    31405,
+    31406,
+    31407,
+    31408,
+    31409,
+    31410
+  ],
+  "DNS": [
+    "8.8.8.8",
+    "8.8.4.4"
+  ],
+  "TelegramReport": true,
+  "SoundAlertOnCritical": true,
+  "HistoryDays": 30,
+  "LogRetentionDays": 14,
+  "MinProcessMB_CleanRAM": 500,
+  "MaxProcessesToKill": 8,
+  "BaselineCompare": true,
+  "AnomalySense": true,
+  "ControllerBridge": {
+    "Enabled": false,
+    "BridgeScript": "",
+    "ReportFiles": [
+      "Data/last_report.json",
+      "Data/controller_bridge.json",
+      "Data/telegram_report.txt"
+    ],
+    "StdoutPrefix": "SPIDER|",
+    "Note": "HTTP Bridge removed; use Dashboard + one-way Telegram"
+  },
+  "TelegramOneWay": true,
+  "HttpBridge": "REMOVED",
+  "Notify": {
+    "AfterEachPatrol": false,
+    "DailyDigest": true,
+    "DailyDigestWindow": "19:00-20:00"
+  },
+  "Orchestrator": {
+    "Enabled": true,
+    "IntervalSeconds": 90,
+    "RequireRunningForScan": false,
+    "Note": "Central conductor. Dashboard keeps tick while open; Scheduler optional."
+  },
+  "Care": {
+    "Enabled": true,
+    "MaxPerDay": 6,
+    "MinMinutesBetween": 60,
+    "SkipWhenCatchingUp": true,
+    "Items": [
+      "DISK_GUARD",
+      "PORT_PULSE",
+      "DNS_REFRESH",
+      "RAM_PRESSURE",
+      "TEMP_HOUSEKEEP",
+      "WEEKLY_LIGHT",
+      "POWER_ADVISORY"
+    ],
+    "Note": "Community-informed proactive care; never deletes blockchain data"
+  }
+}

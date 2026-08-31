@@ -1,0 +1,30 @@
+{
+  "Version": "2.1.5",
+  "Description": "Spider Sense — soft anomaly thresholds vs hard critical thresholds in Config",
+  "Enabled": true,
+  "BaselineWindowHours": 24,
+  "Signals": {
+    "PeersDropRatio": {
+      "WarnIfDropPercent": 25,
+      "Description": "Peers fell >25% vs baseline average"
+    },
+    "RamRisePoints": {
+      "WarnIfRise": 15,
+      "Description": "RAM used% rose >15 points vs baseline"
+    },
+    "CpuRisePoints": {
+      "WarnIfRise": 20,
+      "Description": "CPU rose >20 points vs baseline"
+    },
+    "LedgerAgeRise": {
+      "WarnIfSec": 20,
+      "Description": "Ledger age above soft warn even if under critical"
+    },
+    "DiskDropGB": {
+      "WarnIfDropGB": 10,
+      "Description": "Free disk dropped >10GB in window"
+    }
+  },
+  "ActionOnAnomalyOnly": "WAIT_MONITOR",
+  "Notes": "Anomaly alone does not trigger HIGH recovery — only elevates attention"
+}

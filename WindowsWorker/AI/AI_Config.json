@@ -1,0 +1,42 @@
+{
+  "Version": "2.1.8",
+  "Enabled": true,
+  "Provider": "Local",
+  "Providers": {
+    "Local": {
+      "Description": "Rule-based explanation offline — always safe",
+      "RequiresNetwork": false
+    },
+    "Gemini": {
+      "Description": "Optional Google Gemini HTTP — advisory only",
+      "RequiresNetwork": true,
+      "EnvApiKey": "GEMINI_API_KEY",
+      "ConfigApiKeyField": "GeminiApiKey",
+      "DefaultModel": "gemini-3.1-flash-lite-preview",
+      "TimeoutSec": 30,
+      "MaxOutputTokens": 512,
+      "PreferredModels": [
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3-flash-preview",
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite"
+      ]
+    }
+  },
+  "Policy": {
+    "NeverExecuteActions": true,
+    "NeverBypassSafety": true,
+    "NeverChangeMode": true,
+    "AdvisoryOnly": true,
+    "MaxConfidenceBoost": 5
+  },
+  "GeminiApiKey": "",
+  "IncludeSnapshotSummary": true,
+  "IncludeDoctorPanel": true,
+  "Language": "vi"
+}

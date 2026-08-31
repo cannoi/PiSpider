@@ -1,0 +1,72 @@
+{
+  "Version": "2.3.4",
+  "Sources": ["GitHub pi-node", "Reddit r/PiNetwork", "YouTube node troubleshooting", "Facebook Pi Node notes", "X/community"],
+  "Goal": "Maximize uptime + sync + open ports for Node bonus; minimal intervention; never hang Docker/WSL",
+  "Scenarios": [
+    {
+      "Id": "SYNC_LAG",
+      "Symptoms": ["Catching up", "ledger age high", "local block behind"],
+      "Autonomous": ["WAIT_MONITOR", "RESTART_NODE"],
+      "Avoid": ["wsl --shutdown", "full /reset", "image prune -a"],
+      "Notes": "Community: restart container only first; long catchup can be normal after upgrade"
+    },
+    {
+      "Id": "DOCKER_DAEMON_DOWN",
+      "Symptoms": ["Docker Daemon not running", "engine unhealthy"],
+      "Autonomous": ["SOFT_DOCKER_RESTART", "ORDERED_WSL_RECYCLE"],
+      "Avoid": ["wsl --shutdown while Desktop running"],
+      "Notes": "GitHub #496; Soft Desktop recycle then ordered WSL"
+    },
+    {
+      "Id": "CONTAINER_EXITED",
+      "Symptoms": ["testnet2 exited", "consensus exited", "postgres wait loop"],
+      "Autonomous": ["RESTART_NODE", "SOFT_DOCKER_RESTART"],
+      "Avoid": ["delete docker_volumes automatically"],
+      "Notes": "PG/WAL issues under WSL2; escalate volume wipe only with user approval"
+    },
+    {
+      "Id": "ZERO_PEERS_PORTS",
+      "Symptoms": ["incoming 0", "outgoing 0", "ports closed", "not supporting nodes"],
+      "Autonomous": ["FIREWALL_CHECK", "DNS_REFRESH", "NETWORK_REPAIR"],
+      "Avoid": ["RESTART_DOCKER as first step"],
+      "Notes": "Bonus needs ports 31401-31410 + router forward; Spider checks local LISTEN"
+    },
+    {
+      "Id": "RAM_PRESSURE",
+      "Symptoms": ["RAM high", "vmmem high", "host pressure"],
+      "Autonomous": ["CLEAN_RAM", "CLEAN_TEMP"],
+      "Avoid": ["kill docker", "wsl --shutdown"],
+      "Notes": "vmmem high is often normal with Node; trim user apps only"
+    },
+    {
+      "Id": "DISK_LOW",
+      "Symptoms": ["disk free low"],
+      "Autonomous": ["CLEAN_TEMP", "MAINTENANCE_LIGHT"],
+      "Avoid": ["delete blockchain data"],
+      "Notes": "Never auto-wipe docker_volumes / blockchain"
+    },
+    {
+      "Id": "AFTER_DOCKER_UPDATE",
+      "Symptoms": ["empty containers", "starting network stuck", "not running blockchain"],
+      "Autonomous": ["SOFT_DOCKER_RESTART", "RESTART_NODE"],
+      "Avoid": ["HOST_REBOOT first"],
+      "Notes": "Reddit: Docker update broke containers; soft recycle then container"
+    },
+    {
+      "Id": "PROLONGED_FAILURE",
+      "Symptoms": ["all soft steps failed", "engine still down"],
+      "Autonomous": ["ORDERED_WSL_RECYCLE"],
+      "Escalate": ["HOST_REBOOT with approval", "manual Pi Desktop tech setup"],
+      "Notes": "User incident: full PC reboot fixed hang after bad reset"
+    }
+  ],
+  "BonusStabilityPriority": [
+    "Docker engine healthy",
+    "Pi container Up",
+    "Ports 31401-31403 LISTEN",
+    "Internet + DNS OK",
+    "Synced or actively catching up",
+    "Peers > 0 when possible",
+    "RAM/Disk not critical"
+  ]
+}

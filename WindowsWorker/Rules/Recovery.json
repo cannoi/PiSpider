@@ -1,0 +1,180 @@
+{
+  "Version": "2.2.6",
+  "Description": "Recovery policy — dependency order, timeouts, retries, minimal intervention",
+  "DependencyOrder": [
+    "Internet",
+    "WindowsNetwork",
+    "Firewall",
+    "WSL",
+    "Docker",
+    "PiContainer",
+    "Stellar",
+    "Sync"
+  ],
+  "NeverResetBelowBrokenDependency": true,
+  "MinimalIntervention": true,
+  "MaxPipelineSteps": 5,
+  "VerifyAfterEachStep": true,
+  "Actions": {
+    "CLEAN_RAM": {
+      "Risk": "LOW",
+      "TimeoutSec": 60,
+      "Retry": 0,
+      "NeedsAdmin": false,
+      "Layer": null
+    },
+    "CLEAN_TEMP": {
+      "Risk": "LOW",
+      "TimeoutSec": 120,
+      "Retry": 0,
+      "NeedsAdmin": false,
+      "Layer": null
+    },
+    "DNS_REFRESH": {
+      "Risk": "LOW",
+      "TimeoutSec": 15,
+      "Retry": 1,
+      "NeedsAdmin": false,
+      "Layer": "WindowsNetwork"
+    },
+    "NETWORK_REPAIR": {
+      "Risk": "MEDIUM",
+      "TimeoutSec": 120,
+      "Retry": 1,
+      "NeedsAdmin": true,
+      "Layer": "Internet"
+    },
+    "FIREWALL_CHECK": {
+      "Risk": "LOW",
+      "TimeoutSec": 30,
+      "Retry": 0,
+      "NeedsAdmin": true,
+      "Layer": "Firewall"
+    },
+    "RESTART_CONTAINER": {
+      "Risk": "MEDIUM",
+      "TimeoutSec": 90,
+      "Retry": 1,
+      "NeedsAdmin": false,
+      "Layer": "PiContainer"
+    },
+    "RESTART_DOCKER": {
+      "Risk": "HIGH",
+      "TimeoutSec": 300,
+      "Retry": 1,
+      "NeedsAdmin": false,
+      "Layer": "Docker",
+      "Notes": "Uses soft then ordered WSL; no image prune -a"
+    },
+    "RESTART_WSL": {
+      "Risk": "HIGH",
+      "TimeoutSec": 120,
+      "Retry": 1,
+      "NeedsAdmin": false,
+      "Layer": "WSL"
+    },
+    "RESTART_NODE": {
+      "Risk": "HIGH",
+      "TimeoutSec": 120,
+      "Retry": 1,
+      "NeedsAdmin": false,
+      "Layer": "PiContainer"
+    },
+    "MAINTENANCE_LIGHT": {
+      "Risk": "LOW",
+      "TimeoutSec": 180,
+      "Retry": 0,
+      "NeedsAdmin": false,
+      "Layer": null
+    },
+    "WAIT_MONITOR": {
+      "Risk": "NONE",
+      "TimeoutSec": 0,
+      "Retry": 0,
+      "NeedsAdmin": false,
+      "Layer": null
+    },
+    "MONITOR": {
+      "Risk": "NONE",
+      "TimeoutSec": 0,
+      "Retry": 0,
+      "NeedsAdmin": false,
+      "Layer": null
+    },
+    "REPORT_CONFIG": {
+      "Risk": "NONE",
+      "TimeoutSec": 0,
+      "Retry": 0,
+      "NeedsAdmin": false,
+      "Layer": null
+    },
+    "NONE": {
+      "Risk": "NONE",
+      "TimeoutSec": 0,
+      "Retry": 0,
+      "NeedsAdmin": false,
+      "Layer": null
+    },
+    "SOFT_DOCKER_RESTART": {
+      "Risk": "HIGH",
+      "TimeoutSec": 200,
+      "Retry": 0,
+      "NeedsAdmin": false,
+      "Layer": "Docker"
+    },
+    "ORDERED_WSL_RECYCLE": {
+      "Risk": "HIGH",
+      "TimeoutSec": 240,
+      "Retry": 0,
+      "NeedsAdmin": false,
+      "Layer": "WSL"
+    },
+    "HOST_REBOOT": {
+      "Risk": "EXTREME",
+      "TimeoutSec": 90,
+      "Retry": 0,
+      "NeedsAdmin": true,
+      "Layer": null,
+      "NeverAuto": true
+    }
+  },
+  "LevelPipelines": {
+    "soft": [
+      "MAINTENANCE_LIGHT"
+    ],
+    "network": [
+      "NETWORK_REPAIR",
+      "FIREWALL_CHECK"
+    ],
+    "node": [
+      "RESTART_NODE"
+    ],
+    "docker": [
+      "SOFT_DOCKER_RESTART"
+    ],
+    "wsl": [
+      "ORDERED_WSL_RECYCLE"
+    ],
+    "hard": [
+      "RESTART_NODE",
+      "SOFT_DOCKER_RESTART",
+      "ORDERED_WSL_RECYCLE"
+    ],
+    "all": [
+      "RESTART_NODE",
+      "SOFT_DOCKER_RESTART",
+      "ORDERED_WSL_RECYCLE"
+    ],
+    "reboot": [
+      "HOST_REBOOT"
+    ]
+  },
+  "Notes": "Ordered recovery: NODE -> SOFT_DOCKER -> ORDERED_WSL. Never wsl --shutdown while Docker Desktop runs. No bulk docker stop hang.",
+  "HangPrevention": {
+    "NeverWslShutdownWhileDockerDesktopRunning": true,
+    "NeverDockerStopAllWithoutTimeout": true,
+    "NeverImagePruneAllByDefault": true,
+    "PreferContainerRestartForSyncLag": true,
+    "HostRebootRequiresEmergencyGuardianAndApproval": true
+  }
+}

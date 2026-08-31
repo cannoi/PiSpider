@@ -1,0 +1,228 @@
+{
+  "Version": "2.3.4",
+  "Description": "Root Cause rules — Symptom to Action with confidence and risk",
+  "PriorityOrder": [
+    "OBSERVE",
+    "PROTECT",
+    "DIAGNOSE",
+    "WAIT",
+    "CLEAN",
+    "REPAIR",
+    "RESET",
+    "VERIFY",
+    "ESCALATE"
+  ],
+  "SeverityLevels": [
+    "HEALTHY",
+    "INFO",
+    "WARNING",
+    "DEGRADED",
+    "CRITICAL",
+    "EMERGENCY"
+  ],
+  "Rules": [
+    {
+      "Id": "NODE_HEALTHY",
+      "Severity": "HEALTHY",
+      "Condition": "NodeHealthy AND DockerHealthy AND StellarSynced AND RAM < RAM_Warning AND Internet AND DiskOK",
+      "RootCause": "System healthy",
+      "ConfidenceBase": 99,
+      "Action": "NONE",
+      "Risk": "NONE",
+      "ImpactOnNode": "NONE"
+    },
+    {
+      "Id": "RAM_USER_PRESSURE",
+      "Severity": "WARNING",
+      "Condition": "RAM >= RAM_Warning AND TopMemoryIsUserApp AND NodeHealthy",
+      "RootCause": "User application memory pressure",
+      "ConfidenceBase": 90,
+      "Action": "CLEAN_RAM",
+      "Risk": "LOW",
+      "ImpactOnNode": "LOW"
+    },
+    {
+      "Id": "RAM_CRITICAL_USER",
+      "Severity": "CRITICAL",
+      "Condition": "RAM >= RAM_Critical AND TopMemoryIsUserApp",
+      "RootCause": "Critical user app memory pressure",
+      "ConfidenceBase": 95,
+      "Action": "CLEAN_RAM",
+      "Risk": "LOW",
+      "ImpactOnNode": "MEDIUM"
+    },
+    {
+      "Id": "RAM_WSL_DOCKER",
+      "Severity": "WARNING",
+      "Condition": "RAM >= RAM_Warning AND (vmmemHigh OR DockerHighMem) AND NodeHealthy AND NOT TopMemoryIsUserApp",
+      "RootCause": "WSL/Docker memory usage (expected for Node)",
+      "ConfidenceBase": 85,
+      "Action": "MONITOR",
+      "Risk": "NONE",
+      "ImpactOnNode": "NONE"
+    },
+    {
+      "Id": "CPU_HIGH",
+      "Severity": "WARNING",
+      "Condition": "CPU >= CPU_Warning AND NodeHealthy",
+      "RootCause": "High CPU load",
+      "ConfidenceBase": 80,
+      "Action": "MONITOR",
+      "Risk": "NONE",
+      "ImpactOnNode": "LOW"
+    },
+    {
+      "Id": "CPU_CRITICAL",
+      "Severity": "CRITICAL",
+      "Condition": "CPU >= CPU_Critical",
+      "RootCause": "Critical CPU load",
+      "ConfidenceBase": 88,
+      "Action": "MAINTENANCE_LIGHT",
+      "Risk": "LOW",
+      "ImpactOnNode": "MEDIUM"
+    },
+    {
+      "Id": "DOCKER_ENGINE_DOWN",
+      "Severity": "CRITICAL",
+      "Condition": "DockerEngine == false",
+      "RootCause": "Docker Engine unavailable",
+      "ConfidenceBase": 98,
+      "Action": "RESTART_DOCKER",
+      "Risk": "HIGH",
+      "ImpactOnNode": "HIGH"
+    },
+    {
+      "Id": "PI_CONTAINER_DOWN",
+      "Severity": "CRITICAL",
+      "Condition": "PiContainerRunning == false AND DockerEngine == true",
+      "RootCause": "Pi Node container not running",
+      "ConfidenceBase": 95,
+      "Action": "RESTART_NODE",
+      "Risk": "HIGH",
+      "ImpactOnNode": "HIGH"
+    },
+    {
+      "Id": "NETWORK_DOWN",
+      "Severity": "CRITICAL",
+      "Condition": "InternetReachable == false",
+      "RootCause": "No internet connectivity",
+      "ConfidenceBase": 95,
+      "Action": "NETWORK_REPAIR",
+      "Risk": "MEDIUM",
+      "ImpactOnNode": "HIGH"
+    },
+    {
+      "Id": "DNS_FAIL",
+      "Severity": "WARNING",
+      "Condition": "InternetReachable == true AND DNS == false",
+      "RootCause": "DNS resolution failure",
+      "ConfidenceBase": 90,
+      "Action": "DNS_REFRESH",
+      "Risk": "LOW",
+      "ImpactOnNode": "MEDIUM"
+    },
+    {
+      "Id": "DISK_CRITICAL",
+      "Severity": "CRITICAL",
+      "Condition": "DiskFreeGB < Disk_Free_GB_Critical",
+      "RootCause": "Critical low disk space",
+      "ConfidenceBase": 98,
+      "Action": "CLEAN_TEMP",
+      "Risk": "MEDIUM",
+      "ImpactOnNode": "HIGH"
+    },
+    {
+      "Id": "DISK_LOW",
+      "Severity": "WARNING",
+      "Condition": "DiskFreeGB < Disk_Free_GB_Warning",
+      "RootCause": "Low disk space",
+      "ConfidenceBase": 90,
+      "Action": "CLEAN_TEMP",
+      "Risk": "LOW",
+      "ImpactOnNode": "LOW"
+    },
+    {
+      "Id": "STELLAR_STALL",
+      "Severity": "WARNING",
+      "Condition": "LedgerAge > LedgerAge_Warning_Sec AND Peers < Peers_Min_Warning",
+      "RootCause": "Low peer connectivity / possible network issue",
+      "ConfidenceBase": 70,
+      "Action": "WAIT_MONITOR",
+      "Risk": "NONE",
+      "ImpactOnNode": "MEDIUM",
+      "Notes": "Brief stall: wait before any reset"
+    },
+    {
+      "Id": "STELLAR_STALL_CRITICAL",
+      "Severity": "CRITICAL",
+      "Condition": "LedgerAge > LedgerAge_Critical_Sec AND Peers < Peers_Min_Critical",
+      "RootCause": "Stellar sync stalled prolonged",
+      "ConfidenceBase": 88,
+      "Action": "RESTART_NODE",
+      "Risk": "HIGH",
+      "ImpactOnNode": "HIGH",
+      "Notes": "Sync lag: restart container ONLY. Never jump to wsl --shutdown."
+    },
+    {
+      "Id": "PORTS_CLOSED",
+      "Severity": "WARNING",
+      "Condition": "LocalPiPortsOpen == false AND NodeHealthy",
+      "RootCause": "Pi Node ports not listening locally",
+      "ConfidenceBase": 75,
+      "Action": "FIREWALL_CHECK",
+      "Risk": "LOW",
+      "ImpactOnNode": "MEDIUM"
+    },
+    {
+      "Id": "CONFIG_CHANGED",
+      "Severity": "INFO",
+      "Condition": "BaselineDiff == true",
+      "RootCause": "Configuration changed since baseline",
+      "ConfidenceBase": 90,
+      "Action": "REPORT_CONFIG",
+      "Risk": "NONE",
+      "ImpactOnNode": "UNKNOWN"
+    },
+    {
+      "Id": "VIRTUALIZATION_OFF",
+      "Severity": "CRITICAL",
+      "Condition": "VirtualizationEnabled == false",
+      "RootCause": "CPU virtualization disabled in BIOS/firmware",
+      "ConfidenceBase": 99,
+      "Action": "NONE",
+      "Risk": "EXTREME",
+      "ImpactOnNode": "HIGH",
+      "Notes": "User must enable VT-x/AMD-V manually — Spider never touches BIOS"
+    },
+    {
+      "Id": "WSL_DOWN",
+      "Severity": "CRITICAL",
+      "Condition": "WSLAvailable == false AND DockerEngine == false",
+      "RootCause": "WSL unavailable and Docker down (coupled)",
+      "ConfidenceBase": 92,
+      "Action": "RESTART_DOCKER",
+      "Risk": "HIGH",
+      "ImpactOnNode": "HIGH"
+    },
+    {
+      "Id": "PEERS_ZERO_PORTS_OK",
+      "When": "Peers very low but ports listening and internet OK",
+      "Match": {
+        "FindingId": "STELLAR_NO_PEERS"
+      },
+      "Action": "WAIT_MONITOR",
+      "Risk": "LOW",
+      "Notes": "Community: wait before hard restart; bonus may need router forward (manual)"
+    },
+    {
+      "Id": "PORTS_CLOSED_LOCAL",
+      "When": "Local Pi ports not listening",
+      "Match": {
+        "FindingId": "PORTS_CLOSED"
+      },
+      "Action": "FIREWALL_CHECK",
+      "Risk": "MEDIUM",
+      "Notes": "Check Windows firewall; router port forward is user/manual"
+    }
+  ]
+}

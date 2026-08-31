@@ -1,0 +1,27 @@
+# Secrets & local runtime
+Data/secrets.json
+Data/*secret*
+Data/conductor_bus.json
+Data/orchestrator_state.json
+Data/care_state.json
+Data/last_report.json
+Data/node_status_latest.json
+Data/care_activity.json
+Data/pending_approval.json
+Data/history.json
+Data/runtime_mode.json
+Data/inapp_auto_state.json
+Logs/**
+*.log
+
+# Build / local
+PiSpider.exe
+*.user
+.vs/
+bin/
+obj/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store

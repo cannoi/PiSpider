@@ -1,0 +1,78 @@
+{
+  "Version": "1.0",
+  "Source": "Community practices (forums, X, GitHub issues, node guides) synthesized for safe auto-care",
+  "Principles": [
+    "Prefer wait when Catching up — community: lag often self-heals",
+    "Never remove blockchain data automatically",
+    "Never full Docker purge / WSL shutdown in care path",
+    "Disk free space is a top real-world failure mode",
+    "Ports 31401-31403 and stable power (no sleep) matter for peers/bonus",
+    "Light host cleanup only when Node is healthy"
+  ],
+  "CareItems": [
+    {
+      "Id": "DISK_GUARD",
+      "When": "Free disk < 25GB or FreePct < 12",
+      "Action": "DISK_ALERT",
+      "Risk": "NONE",
+      "Auto": true,
+      "Purpose": "Blockchain data grows; full disk breaks Docker/Node"
+    },
+    {
+      "Id": "PORT_PULSE",
+      "When": "Any of 31401/31402/31403 not listening while container up",
+      "Action": "PORT_CHECK",
+      "Risk": "LOW",
+      "Auto": true,
+      "Purpose": "Peers and API need open ports"
+    },
+    {
+      "Id": "DNS_REFRESH",
+      "When": "Internet OK but DNS flaky or weekly slot",
+      "Action": "DNSREFRESH",
+      "Risk": "LOW",
+      "Auto": true,
+      "Purpose": "History archive and peers need reliable DNS"
+    },
+    {
+      "Id": "TEMP_HOUSEKEEP",
+      "When": "Healthy Node, temp noise, every few hours budget",
+      "Action": "CLEANTEMP",
+      "Risk": "LOW",
+      "Auto": true,
+      "Purpose": "Keep host clean without touching Node volumes"
+    },
+    {
+      "Id": "RAM_PRESSURE",
+      "When": "RAM used > 82% and Node healthy",
+      "Action": "CLEANRAM",
+      "Risk": "LOW",
+      "Auto": true,
+      "Purpose": "User apps pressure host; protect headroom for Docker/WSL"
+    },
+    {
+      "Id": "WEEKLY_LIGHT",
+      "When": "Once per week when healthy",
+      "Action": "MAINTENANCE_LIGHT",
+      "Risk": "LOW",
+      "Auto": true,
+      "Purpose": "Community-style light maintenance without reset"
+    },
+    {
+      "Id": "POWER_ADVISORY",
+      "When": "Detect sleep-friendly power plan (advisory only)",
+      "Action": "POWER_ADVISORY",
+      "Risk": "NONE",
+      "Auto": true,
+      "Purpose": "Sleep/hibernate stops the Node — operators set Sleep=Never"
+    },
+    {
+      "Id": "SYNC_WAIT",
+      "When": "Catching up / ledger lag",
+      "Action": "WAIT_MONITOR",
+      "Risk": "NONE",
+      "Auto": true,
+      "Purpose": "Community: wait 10-60+ min before restart; avoid reset storm"
+    }
+  ]
+}

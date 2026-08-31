@@ -1,0 +1,48 @@
+{
+  "Version": "2.1.5",
+  "Description": "Six severity levels — meaning and default posture",
+  "Levels": {
+    "HEALTHY": {
+      "Order": 0,
+      "Icon": "🟢",
+      "Meaning": "All critical components within normal range",
+      "DefaultAction": "NONE",
+      "EscalateAfterMinutes": null
+    },
+    "INFO": {
+      "Order": 1,
+      "Icon": "🔵",
+      "Meaning": "Change detected or informational finding",
+      "DefaultAction": "REPORT_CONFIG",
+      "EscalateAfterMinutes": null
+    },
+    "WARNING": {
+      "Order": 2,
+      "Icon": "🟡",
+      "Meaning": "Degraded signal — monitor or low-risk clean",
+      "DefaultAction": "WAIT_MONITOR",
+      "EscalateAfterMinutes": 30
+    },
+    "DEGRADED": {
+      "Order": 3,
+      "Icon": "🟠",
+      "Meaning": "Node still up but performance/sync suffering",
+      "DefaultAction": "DIAGNOSE",
+      "EscalateAfterMinutes": 15
+    },
+    "CRITICAL": {
+      "Order": 4,
+      "Icon": "🔴",
+      "Meaning": "Node function impacted — recovery candidate",
+      "DefaultAction": "REPAIR",
+      "EscalateAfterMinutes": 5
+    },
+    "EMERGENCY": {
+      "Order": 5,
+      "Icon": "🟣",
+      "Meaning": "Imminent node failure — guardian mode",
+      "DefaultAction": "RECOVERY",
+      "EscalateAfterMinutes": 0
+    }
+  }
+}

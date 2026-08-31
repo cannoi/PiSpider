@@ -1,0 +1,18 @@
+{
+  "App": "PiSpiderHybridLive",
+  "MinCore": "1.0.0",
+  "UpdatedAt": "2026-08-31",
+  "Packs": [
+    {
+      "Id": "windows-worker",
+      "Name": "PiSpider Hybrid Worker (Windows)",
+      "Version": "2.3.31",
+      "Url": "https://github.com/YOUR_ORG/PiSpiderHybridLive/releases/latest/download/windows-worker.zip",
+      "Sha256": "REPLACE_AFTER_RELEASE",
+      "ExtractTo": ".",
+      "Activate": "Activate_Worker.bat",
+      "ActivatePs": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\LiveWorker.ps1",
+      "Notes": "No Dashboard. File-bus worker for the Windows Node PC."
+    }
+  ]
+}

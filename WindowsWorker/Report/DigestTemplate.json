@@ -1,0 +1,49 @@
+{
+  "Version": "1.0",
+  "Language": "auto",
+  "Title": "[SPIDER] DAILY DIGEST",
+  "Separator": "----------------",
+  "ShowPcUser": true,
+  "ShowHealth": true,
+  "ShowIssues": true,
+  "ShowNotes": true,
+  "ShowInsight": true,
+  "ShowApprovalHint": true,
+  "ShowTimestamp": true,
+  "MaxIssueDetailChars": 120,
+  "MaxInsightChars": 280,
+  "MaxNotes": 5,
+  "Icons": {
+    "OK": "[OK]",
+    "Warn": "[!]",
+    "Crit": "[X]",
+    "Emer": "[!!]",
+    "Info": "[i]",
+    "Docker": "[D]",
+    "Node": "[N]",
+    "Net": "[W]",
+    "Ram": "[R]",
+    "Action": "[A]"
+  },
+  "Text": {
+    "en": {
+      "NoIssues": "No issues needing attention",
+      "Stable": "Node stable — no change needed",
+      "IssuesHeader": "--- Issues ({0}) ---",
+      "NotesHeader": "--- Notes ---",
+      "InsightHeader": "--- Insight ---",
+      "ApprovalHint": "Approval pending — open PiSpider Dashboard",
+      "HealthLine": "{0} Health {1}/100 {2}"
+    },
+    "vi": {
+      "NoIssues": "Khong phat hien van de can chu y",
+      "Stable": "Node on dinh — giu nguyen",
+      "IssuesHeader": "--- Van de ({0}) ---",
+      "NotesHeader": "--- Ghi chu ---",
+      "InsightHeader": "--- Nhan dinh ---",
+      "ApprovalHint": "Can xac nhan — mo PiSpider Dashboard",
+      "HealthLine": "{0} Suc khoe {1}/100 {2}"
+    }
+  },
+  "ForceLanguage": null
+}
