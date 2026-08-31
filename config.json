@@ -1,0 +1,18 @@
+{
+  "App": "PiSpider Hybrid Core",
+  "Version": "1.0.2",
+  "Listen": "0.0.0.0",
+  "Port": 18770,
+  "GitHub": {
+    "CatalogUrl": "https://raw.githubusercontent.com/cannoi/PiSpider/main/catalog.json",
+    "WorkerPackUrl": "https://github.com/cannoi/PiSpider/archive/refs/heads/main.zip"
+  },
+  "BusDir": "/data/live",
+  "PacksDir": "/data/packs",
+  "Telegram": {
+    "Enabled": false,
+    "BotToken": "",
+    "ChatId": ""
+  },
+  "WindowsActivateHint": "Worker is extracted to this SoloHost app folder /WindowsWorker"
+}

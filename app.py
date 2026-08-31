@@ -50,8 +50,24 @@ def packs_dir() -> Path:
     return d
 
 
+def app_root() -> Path:
+    """SoloHost app folder (compose volume ./:/solohost-config)."""
+    p = Path(os.environ.get("SOLOHOST_CONFIG") or "/solohost-config")
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    except Exception:
+        return data_root()
+
+
 def worker_dir() -> Path:
-    """WindowsWorker lives at SoloHost app root volume: /data/WindowsWorker."""
+    """WindowsWorker at SoloHost app root, fallback /data/WindowsWorker."""
+    for d in (app_root() / "WindowsWorker", data_root() / "WindowsWorker"):
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            return d
+        except Exception:
+            continue
     d = data_root() / "WindowsWorker"
     d.mkdir(parents=True, exist_ok=True)
     return d

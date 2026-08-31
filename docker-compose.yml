@@ -1,0 +1,36 @@
+# PiSpider Hybrid — SoloHost official install
+# Same pattern as pinode-telegram-solohost:
+#   labels.pi.ui.primary → Dashboard inside SoloHost app
+#   ./:/solohost-config  → app root (WindowsWorker extracted here)
+#
+#   docker compose pull && docker compose up -d
+# UI: SoloHost app panel  OR  http://127.0.0.1:18770/
+
+services:
+  pispider-core:
+    image: ghcr.io/cannoi/pispider:latest
+    container_name: pispider-core
+    labels:
+      pi.ui.primary: "true"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18770:18770"
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./data:/data
+      - ./:/solohost-config:rw
+      - ./WindowsWorker:/data/WindowsWorker
+    environment:
+      PISPIDER_CONFIG: /app/config.json
+      PISPIDER_DATA: /data
+      SOLOHOST_CONFIG: /solohost-config
+      TZ: Asia/Ho_Chi_Minh
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 128m
+    cpus: "0.25"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18770/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 5

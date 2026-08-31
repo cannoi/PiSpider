@@ -1,0 +1,22 @@
+title: PiSpider Hybrid Core
+description: Protects the Windows Pi Node. Dashboard is the SoloHost app UI. Worker is downloaded into this app folder.
+output_file: .env
+
+fields:
+  - name: BOT_TOKEN
+    label: Telegram Bot Token (optional)
+    type: password
+    required: false
+    help: One-way notify / approval. Leave empty to use dashboard only.
+
+  - name: CHAT_ID
+    label: Telegram Chat ID (optional)
+    type: text
+    required: false
+    help: Your chat ID.
+
+  - name: GEMINI_API_KEY
+    label: Gemini API Key (optional)
+    type: password
+    required: false
+    help: Used by the Windows Worker for care advice.
