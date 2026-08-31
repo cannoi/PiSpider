@@ -37,9 +37,14 @@ def data_root() -> Path:
 
 
 def bus_dir() -> Path:
-    cfg = load_cfg()
-    d = Path(cfg.get("BusDir") or str(data_root() / "live"))
+    """Same folder LiveWorker reads: WindowsWorker/Data/live."""
+    d = worker_dir() / "Data" / "live"
     d.mkdir(parents=True, exist_ok=True)
+    legacy = data_root() / "live"
+    try:
+        legacy.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
     return d
 
 
@@ -61,16 +66,15 @@ def app_root() -> Path:
 
 
 def worker_dir() -> Path:
-    """WindowsWorker at SoloHost app root, fallback /data/WindowsWorker."""
-    for d in (app_root() / "WindowsWorker", data_root() / "WindowsWorker"):
-        try:
-            d.mkdir(parents=True, exist_ok=True)
-            return d
-        except Exception:
-            continue
-    d = data_root() / "WindowsWorker"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+    """Only one copy: SoloHost app root /WindowsWorker."""
+    d = app_root() / "WindowsWorker"
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    except Exception:
+        d = data_root() / "WindowsWorker"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
 
 
 def bundled_zip() -> Path | None:
@@ -244,7 +248,8 @@ def api_status():
             "packInstalled": bool(pack.get("Ready")),
             "packActivated": bool(pack.get("Activated")),
             "pack": pack,
-            "workerPath": str(data_root() / "WindowsWorker"),
+            "workerPath": str(worker_dir()),
+            "busPath": str(bus_dir()),
             "termsAccepted": bool((read_json(data_root() / "terms_accepted.json") or {}).get("Accepted")),
             "activateHint": load_cfg().get("WindowsActivateHint"),
         }
@@ -299,6 +304,16 @@ def try_start_windows_worker() -> dict:
         },
     )
     (wd / "START_NOW.flag").write_text(now_iso(), encoding="utf-8")
+    cmd = app_root() / "START_PISPIDER_WORKER.cmd"
+    try:
+        cmd.write_text(
+            "@echo off\r\n"
+            "cd /d \"%~dp0WindowsWorker\"\r\n"
+            "start \"\" powershell -NoProfile -ExecutionPolicy Bypass -File \".\\LiveWorker.ps1\"\r\n",
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
 
     started = False
     method = "flag-only"
@@ -377,15 +392,20 @@ def health():
     return jsonify({"ok": True, "service": "pispider-core"})
 
 
+@app.get("/Activate_Worker.bat")
+def download_activate_bat():
+    wd = worker_dir()
+    p = wd / "Activate_Worker.bat"
+    if not p.is_file():
+        p.write_text(
+            "@echo off\r\ncd /d \"%~dp0\"\r\npowershell -NoProfile -ExecutionPolicy Bypass -File \".\\LiveWorker.ps1\"\r\n",
+            encoding="utf-8",
+        )
+    from flask import send_file
+    return send_file(p, as_attachment=True, download_name="Activate_Worker.bat")
+
+
 if __name__ == "__main__":
     c = load_cfg()
-    bus_dir()
     packs_dir()
-    try:
-        ensure_windows_worker()
-    except Exception as ex:
-        write_json(
-            data_root() / "install_state.json",
-            {"WorkerPack": {"Ready": False, "Activated": False, "Reason": str(ex), "UpdatedAt": now_iso()}},
-        )
-    app.run(host=c.get("Listen") or "0.0.0.0", port=int(c.get("Port") or 18770), debug=False)
+    app.run(host=c.get("Listen") or "0.0.0.0", port=int(c.get("Port") or 18770), debug=False, threaded=True)

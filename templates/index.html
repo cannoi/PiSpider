@@ -3,91 +3,102 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>PiSpider Hybrid Core</title>
+  <title>PiSpider</title>
   <style>
     body { font-family: Segoe UI, sans-serif; background:#f4f5f7; color:#222; margin:0; }
     .wrap { max-width:720px; margin:0 auto; padding:16px; }
-    h1 { margin:8px 0 4px; }
-    .sub { color:#666; margin-bottom:16px; }
     button { font-size:16px; padding:12px 16px; margin:4px 4px 4px 0; border:0; border-radius:8px; cursor:pointer; }
     .go { background:#1e7850; color:#fff; width:100%; font-weight:700; }
     .sec { background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin:12px 0; }
     pre { white-space:pre-wrap; font-size:13px; }
-    .cmd { background:#111; color:#cfe; padding:10px; border-radius:6px; font-family:Consolas,monospace; font-size:12px; }
+    .err { color:#a33; }
     label { display:block; margin:8px 0; }
-    #panel { display:none; }
   </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>PiSpider Hybrid Core</h1>
-  <div class="sub">SoloHost dashboard — one confirm starts care on the Windows Node.</div>
-
+  <h1>PiSpider</h1>
+  <p>One confirm starts the Windows Worker. Buttons talk to the same bus the Worker reads.</p>
   <div id="terms" class="sec">
-    <b>Terms — read once</b>
-    <pre>PiSpider Hybrid watches and repairs the Pi Node on Windows.
-Core on SoloHost only sends commands. The Windows Worker does the work.
-Safe mode: smallest repair first. You can stop the Worker any time.
-Do not use this to attack other machines or change BIOS/firmware.</pre>
-    <label><input id="agree" type="checkbox"> I have read and agree — start Windows Worker</label>
-    <button class="go" onclick="accept()">I AGREE — ACTIVATE</button>
+    <b>Terms</b>
+    <pre>PiSpider watches the Pi Node on this Windows PC.
+Smallest safe repair first. You can stop the Worker any time.</pre>
+    <label><input id="agree" type="checkbox"> I agree — start Windows Worker</label>
+    <button class="go" onclick="accept()">I AGREE — START</button>
   </div>
-
-  <div id="panel">
+  <div id="panel" style="display:none">
     <button class="go" onclick="cmd('SCAN')">START CARE</button>
-    <div style="margin-top:8px">
+    <div>
       <button onclick="cmd('PATROL')">Patrol</button>
       <button onclick="cmd('DIGEST')">Daily report</button>
       <button onclick="cmd('REPAIR')">Repair</button>
-      <button onclick="cmd('APPROVE')">Approve</button>
-      <button onclick="cmd('DENY')">Deny</button>
     </div>
-    <div class="sec"><b>NOW / DONE / NEXT</b><pre id="story">Loading…</pre></div>
-    <div class="sec">
-      <b>Worker folder on this SoloHost</b>
-      <div class="cmd">data/WindowsWorker/Activate_Worker.bat</div>
-      <div class="sub">If Worker stays OFF, run that file once on the Windows Node PC. After that, I AGREE starts it through the bus.</div>
-    </div>
+    <div class="sec"><b>NOW / DONE / NEXT</b><pre id="story">...</pre></div>
+    <p><a href="/Activate_Worker.bat">Download Activate_Worker.bat</a> (only if Worker stays OFF)</p>
   </div>
+  <div id="err" class="err"></div>
 </div>
 <script>
+const BASES = ['', 'http://127.0.0.1:18770'];
+async function api(path, opt){
+  let last = 'no response';
+  for (const b of BASES){
+    try {
+      const r = await fetch(b + path, Object.assign({
+        headers: {'Content-Type':'application/json'}
+      }, opt || {}));
+      const j = await r.json();
+      if (r.ok) return j;
+      last = j.error || ('HTTP ' + r.status);
+    } catch(e){ last = String(e); }
+  }
+  throw new Error(last);
+}
 async function refresh(){
-  const r = await fetch('/api/status').then(x=>x.json());
-  const agreed = !!r.termsAccepted;
-  document.getElementById('terms').style.display = agreed ? 'none' : 'block';
-  document.getElementById('panel').style.display = agreed ? 'block' : 'none';
-  if (!agreed) return;
-  const alive = r.workerAlive;
-  const res = r.lastResult || {};
-  const pending = r.pending || {};
-  let lines = [];
-  lines.push('=== NOW ===');
-  lines.push(alive ? ('Worker ON  busy=' + !!r.workerBusy) : 'Worker starting / waiting for Windows…');
-  lines.push('');
-  lines.push('=== DONE ===');
-  if (res.Action) lines.push('Last: ' + res.Action + '  ' + (res.At||''));
-  if (res.Health) lines.push('Health: ' + res.Health);
-  if (res.Summary) lines.push(res.Summary);
-  if (!res.Action) lines.push('No result yet.');
-  lines.push('');
-  lines.push('=== NEXT ===');
-  if (!alive) lines.push('Accepted. If still OFF after 20s: run Activate_Worker.bat once on Windows.');
-  else if (pending.Action) lines.push('Approval needed: ' + pending.Action);
-  else lines.push('Worker is live. Press START CARE or wait.');
-  document.getElementById('story').textContent = lines.join('\n');
+  try {
+    const r = await api('/api/status');
+    document.getElementById('err').textContent = '';
+    const agreed = !!r.termsAccepted;
+    document.getElementById('terms').style.display = agreed ? 'none' : 'block';
+    document.getElementById('panel').style.display = agreed ? 'block' : 'none';
+    if (!agreed) return;
+    const lines = [];
+    lines.push('=== NOW ===');
+    lines.push(r.workerAlive ? ('Worker ON busy=' + !!r.workerBusy) : 'Worker OFF');
+    lines.push('Bus: ' + (r.busPath || ''));
+    lines.push('');
+    lines.push('=== DONE ===');
+    const res = r.lastResult || {};
+    lines.push(res.Action ? (res.Action + ' ' + (res.At||'') + ' ' + (res.Summary||'')) : 'No result yet');
+    if (res.Health) lines.push('Health ' + res.Health);
+    lines.push('');
+    lines.push('=== NEXT ===');
+    const cmd = r.lastCommand || {};
+    lines.push(cmd.Action ? ('Last command ' + cmd.Action) : 'Press START CARE');
+    if (!r.workerAlive) lines.push('If OFF: run WindowsWorker\\Activate_Worker.bat once, then press START CARE again.');
+    document.getElementById('story').textContent = lines.join('\n');
+  } catch(e){
+    document.getElementById('err').textContent = 'Dashboard API: ' + e.message;
+  }
 }
 async function accept(){
-  if (!document.getElementById('agree').checked) { alert('Tick the checkbox first.'); return; }
-  const r = await fetch('/api/accept-terms', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({accepted:true})}).then(x=>x.json());
-  alert(r.hint || 'Activated');
-  refresh();
+  if (!document.getElementById('agree').checked) { alert('Tick the checkbox.'); return; }
+  try {
+    const r = await api('/api/accept-terms', {method:'POST', body: JSON.stringify({accepted:true})});
+    await api('/api/command', {method:'POST', body: JSON.stringify({action:'SCAN'})});
+    alert(r.hint || 'Started. If Worker is OFF, run Activate_Worker.bat once.');
+    refresh();
+  } catch(e){ document.getElementById('err').textContent = e.message; }
 }
 async function cmd(action){
-  await fetch('/api/command', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action})});
-  refresh();
+  try {
+    const r = await api('/api/command', {method:'POST', body: JSON.stringify({action})});
+    document.getElementById('err').textContent = r.ok ? ('Sent ' + action) : (r.error||'fail');
+    refresh();
+  } catch(e){ document.getElementById('err').textContent = e.message; }
 }
 refresh();
-setInterval(refresh, 4000);
+setInterval(refresh, 5000);
 </script>
 </body>
 </html>
