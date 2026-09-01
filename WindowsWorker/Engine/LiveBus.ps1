@@ -9,20 +9,46 @@ function Get-SpiderLiveBusDir {
     return $dir
 }
 
+function Get-SpiderLiveBusDirs {
+    $dirs = New-Object System.Collections.Generic.List[string]
+    $main = Get-SpiderLiveBusDir
+    [void]$dirs.Add($main)
+    $root = $script:SpiderRoot
+    if ($root -and (Split-Path -Leaf $root) -eq 'Engine') { $root = Split-Path -Parent $root }
+    if ($root) {
+        $parent = Split-Path -Parent $root
+        foreach ($extra in @((Join-Path $parent 'data\live'), (Join-Path $parent 'Data\live'))) {
+            try {
+                if (-not (Test-Path -LiteralPath $extra)) { New-Item -ItemType Directory -Path $extra -Force | Out-Null }
+                if (-not $dirs.Contains($extra)) { [void]$dirs.Add($extra) }
+            } catch {}
+        }
+    }
+    return $dirs
+}
+
 function Write-SpiderLiveJson {
     param([string]$Name, $Object)
-    $dir = Get-SpiderLiveBusDir
-    $path = Join-Path $dir $Name
-    $tmp = $path + '.tmp'
-    ($Object | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $tmp -Encoding UTF8
-    Move-Item -LiteralPath $tmp -Destination $path -Force
+    $json = $Object | ConvertTo-Json -Depth 8
+    foreach ($dir in (Get-SpiderLiveBusDirs)) {
+        $path = Join-Path $dir $Name
+        $tmp = $path + '.tmp'
+        try {
+            $json | Set-Content -LiteralPath $tmp -Encoding UTF8
+            Move-Item -LiteralPath $tmp -Destination $path -Force
+        } catch {}
+    }
 }
 
 function Read-SpiderLiveJson {
     param([string]$Name)
-    $path = Join-Path (Get-SpiderLiveBusDir) $Name
-    if (-not (Test-Path -LiteralPath $path)) { return $null }
-    try { return (Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json) } catch { return $null }
+    foreach ($dir in (Get-SpiderLiveBusDirs)) {
+        $path = Join-Path $dir $Name
+        if (Test-Path -LiteralPath $path) {
+            try { return (Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json) } catch {}
+        }
+    }
+    return $null
 }
 
 function Write-SpiderLiveHeartbeat {
@@ -42,15 +68,16 @@ function Read-SpiderLiveCommand {
 }
 
 function Clear-SpiderLiveCommand {
-    $dir = Get-SpiderLiveBusDir
-    $path = Join-Path $dir 'command.json'
-    $last = Join-Path $dir 'command.last.json'
-    if (-not (Test-Path -LiteralPath $path)) { return }
-    try {
-        if (Test-Path -LiteralPath $last) { Remove-Item -LiteralPath $last -Force -ErrorAction Stop }
-        Move-Item -LiteralPath $path -Destination $last -Force
-    } catch {
-        Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+    foreach ($dir in (Get-SpiderLiveBusDirs)) {
+        $path = Join-Path $dir 'command.json'
+        $last = Join-Path $dir 'command.last.json'
+        if (-not (Test-Path -LiteralPath $path)) { continue }
+        try {
+            if (Test-Path -LiteralPath $last) { Remove-Item -LiteralPath $last -Force -ErrorAction SilentlyContinue }
+            Move-Item -LiteralPath $path -Destination $last -Force
+        } catch {
+            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -71,8 +98,8 @@ function Sync-SpiderLiveApproval {
     if (-not $root) { return }
     $src = Join-Path $root 'Data\pending_approval.json'
     if (Test-Path -LiteralPath $src) {
-        try {
-            Copy-Item -LiteralPath $src -Destination (Join-Path (Get-SpiderLiveBusDir) 'pending_approval.json') -Force
-        } catch {}
+        foreach ($dir in (Get-SpiderLiveBusDirs)) {
+            try { Copy-Item -LiteralPath $src -Destination (Join-Path $dir 'pending_approval.json') -Force } catch {}
+        }
     }
 }

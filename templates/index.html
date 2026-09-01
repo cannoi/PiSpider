@@ -6,98 +6,94 @@
   <title>PiSpider</title>
   <style>
     body { font-family: Segoe UI, sans-serif; background:#f4f5f7; color:#222; margin:0; }
-    .wrap { max-width:720px; margin:0 auto; padding:16px; }
+    .wrap { max-width:740px; margin:0 auto; padding:16px; }
     button { font-size:16px; padding:12px 16px; margin:4px 4px 4px 0; border:0; border-radius:8px; cursor:pointer; }
     .go { background:#1e7850; color:#fff; width:100%; font-weight:700; }
     .sec { background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin:12px 0; }
     pre { white-space:pre-wrap; font-size:13px; }
-    .err { color:#a33; }
-    label { display:block; margin:8px 0; }
+    form { display:inline; }
   </style>
 </head>
 <body>
 <div class="wrap">
   <h1>PiSpider</h1>
-  <p>One confirm starts the Windows Worker. Buttons talk to the same bus the Worker reads.</p>
-  <div id="terms" class="sec">
-    <b>Terms</b>
-    <pre>PiSpider watches the Pi Node on this Windows PC.
-Smallest safe repair first. You can stop the Worker any time.</pre>
-    <label><input id="agree" type="checkbox"> I agree — start Windows Worker</label>
-    <button class="go" onclick="accept()">I AGREE — START</button>
+  <p>This app has two parts. SoloHost is the panel. Windows Worker does the Node work on this PC.</p>
+
+  <div class="sec">
+    <b>TWO PARTS — TERMS</b>
+<pre>What this is
+PiSpider is one product in two parts on YOUR computer:
+1) SoloHost panel (this page) — status, buttons, terms.
+2) Windows Worker — PowerShell that reads Docker / Pi Node on Windows.
+
+The panel does not repair the Node by itself. The Worker does.
+
+What is ON by default
+SoloHost sandbox only: this page, the app folder, localhost port 18770.
+The Worker runs only after you start it on Windows.
+
+What you grant if you Confirm
+• The Worker may read Node / Docker / disk status on this Windows PC.
+• The panel may send only whitelist commands: scan, repair, status, patrol.
+• No random PowerShell from the browser.
+
+What we do not claim
+• No access to your Pi wallet or keys.
+• No Docker socket unless you enable that separately.
+• Publisher does not operate your PC.
+
+Your responsibility
+You start and stop the Windows Worker. You can delete the WindowsWorker folder anytime.
+
+After Confirm
+Click START WINDOWS WORKER (or run Start-Worker.cmd in this app folder).
+Then use SCAN / STATUS / REPAIR on this page.
+
+Confirm only if you accept these terms in full.</pre>
+    <form method="post" action="/api/accept-form">
+      <button class="go" type="submit">I CONFIRM — START</button>
+    </form>
   </div>
-  <div id="panel" style="display:none">
-    <button class="go" onclick="run('scan')">SCAN</button>
-    <div>
-      <button onclick="run('repair')">REPAIR</button>
-      <button onclick="run('status')">STATUS</button>
-      <button onclick="run('patrol')">PATROL</button>
-      <button onclick="run('worker')">START WORKER</button>
-    </div>
-    <div class="sec"><b>NOW / DONE / NEXT</b><pre id="story">...</pre></div>
-    <p><a href="/Activate_Worker.bat">Download Activate_Worker.bat</a> (only if Worker stays OFF)</p>
+
+  <div class="sec">
+    <b>Windows Worker</b>
+    <p>One file in the SoloHost app folder: <code>Start-Worker.cmd</code>. Double-click it. A PowerShell window opens and the Worker stays on.</p>
+    <form method="post" action="/api/run-form"><input type="hidden" name="script" value="worker"><button class="go" type="submit">START WINDOWS WORKER</button></form>
+    <p><a href="/Activate_Worker.bat">Download Activate_Worker.bat</a></p>
   </div>
-  <div id="err" class="err"></div>
+
+  <div class="sec">
+    <form method="post" action="/api/run-form"><input type="hidden" name="script" value="scan"><button type="submit">SCAN</button></form>
+    <form method="post" action="/api/run-form"><input type="hidden" name="script" value="status"><button type="submit">STATUS</button></form>
+    <form method="post" action="/api/run-form"><input type="hidden" name="script" value="repair"><button type="submit">REPAIR</button></form>
+    <form method="post" action="/api/run-form"><input type="hidden" name="script" value="patrol"><button type="submit">PATROL</button></form>
+  </div>
+
+  <div class="sec"><b>NOW / DONE / NEXT</b><pre id="story">Open this page to refresh status. Buttons above work without extra clicks.</pre></div>
 </div>
 <script>
 const BASES = ['', 'http://127.0.0.1:18770'];
-async function api(path, opt){
-  let last = 'no response';
+async function api(path){
   for (const b of BASES){
-    try {
-      const r = await fetch(b + path, Object.assign({
-        headers: {'Content-Type':'application/json'}
-      }, opt || {}));
-      const j = await r.json();
-      if (r.ok) return j;
-      last = j.error || ('HTTP ' + r.status);
-    } catch(e){ last = String(e); }
+    try { const r = await fetch(b+path); if (r.ok) return r.json(); } catch(e){}
   }
-  throw new Error(last);
+  return null;
 }
 async function refresh(){
-  try {
-    const r = await api('/api/status');
-    document.getElementById('err').textContent = '';
-    const agreed = !!r.termsAccepted;
-    document.getElementById('terms').style.display = agreed ? 'none' : 'block';
-    document.getElementById('panel').style.display = agreed ? 'block' : 'none';
-    if (!agreed) return;
-    const lines = [];
-    lines.push('=== NOW ===');
-    lines.push(r.workerAlive ? ('Worker ON busy=' + !!r.workerBusy) : 'Worker OFF');
-    lines.push('Bus: ' + (r.busPath || ''));
-    lines.push('');
-    lines.push('=== DONE ===');
-    const res = r.lastResult || {};
-    lines.push(res.Action ? (res.Action + ' ' + (res.At||'') + ' ' + (res.Summary||'')) : 'No result yet');
-    if (res.Health) lines.push('Health ' + res.Health);
-    lines.push('');
-    lines.push('=== NEXT ===');
-    const cmd = r.lastCommand || {};
-    lines.push(cmd.Action ? ('Last command ' + cmd.Action) : 'Press START CARE');
-    if (!r.workerAlive) lines.push('If OFF: run WindowsWorker\\Activate_Worker.bat once, then press START CARE again.');
-    document.getElementById('story').textContent = lines.join('\n');
-  } catch(e){
-    document.getElementById('err').textContent = 'Dashboard API: ' + e.message;
-  }
-}
-async function accept(){
-  if (!document.getElementById('agree').checked) { alert('Tick the checkbox.'); return; }
-  try {
-    const r = await api('/api/accept-terms', {method:'POST', body: JSON.stringify({accepted:true})});
-    await api('/api/run', {method:'POST', body: JSON.stringify({script:'worker'})});
-    await api('/api/run', {method:'POST', body: JSON.stringify({script:'scan'})});
-    alert(r.hint || 'Started. If Worker is OFF, run Activate_Worker.bat once.');
-    refresh();
-  } catch(e){ document.getElementById('err').textContent = e.message; }
-}
-async function run(script){
-  try {
-    const r = await api('/api/run', {method:'POST', body: JSON.stringify({script})});
-    document.getElementById('err').textContent = r.ok ? ('Queued ' + script) : (r.error||'fail');
-    refresh();
-  } catch(e){ document.getElementById('err').textContent = e.message; }
+  const r = await api('/api/status');
+  if (!r) { document.getElementById('story').textContent = 'Panel API not reached. Open http://127.0.0.1:18770/'; return; }
+  const res = r.lastResult || {}, cmd = r.lastCommand || {};
+  document.getElementById('story').textContent = [
+    '=== NOW ===',
+    r.workerAlive ? ('Worker ON  ' + (r.heartbeat && r.heartbeat.Note || '')) : 'Worker OFF — run Start-Worker.cmd',
+    'Bus: ' + (r.busPath||''),
+    '',
+    '=== DONE ===',
+    res.Action ? (res.Action + ' ' + (res.Summary||'') + ' ' + (res.At||'')) : 'No result file yet',
+    '',
+    '=== NEXT ===',
+    cmd.Action ? ('Queued ' + cmd.Action) : 'Press SCAN'
+  ].join('\n');
 }
 refresh();
 setInterval(refresh, 5000);

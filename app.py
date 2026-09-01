@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, redirect
 
 TZ = timezone(timedelta(hours=7))
 app = Flask(__name__)
@@ -36,16 +36,25 @@ def data_root() -> Path:
     return Path(os.environ.get("PISPIDER_DATA", "/data"))
 
 
+def bus_dirs() -> list:
+    out = []
+    for d in (
+        worker_dir() / "Data" / "live",
+        data_root() / "live",
+        app_root() / "data" / "live",
+        app_root() / "Data" / "live",
+    ):
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            if d not in out:
+                out.append(d)
+        except Exception:
+            pass
+    return out or [data_root() / "live"]
+
+
 def bus_dir() -> Path:
-    """Same folder LiveWorker reads: WindowsWorker/Data/live."""
-    d = worker_dir() / "Data" / "live"
-    d.mkdir(parents=True, exist_ok=True)
-    legacy = data_root() / "live"
-    try:
-        legacy.mkdir(parents=True, exist_ok=True)
-    except Exception:
-        pass
-    return d
+    return bus_dirs()[0]
 
 
 def packs_dir() -> Path:
@@ -194,10 +203,25 @@ def read_json(path: Path) -> dict | None:
 
 
 def write_json(path: Path, obj: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(path)
+    text = json.dumps(obj, indent=2, ensure_ascii=False)
+    targets = [path]
+    name = path.name
+    if name in {"command.json", "heartbeat.json", "result.json", "pending_approval.json", "ACTIVATE_NOW.json"}:
+        for d in bus_dirs():
+            targets.append(d / name)
+    seen = set()
+    for t in targets:
+        key = str(t)
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            t.parent.mkdir(parents=True, exist_ok=True)
+            tmp = t.with_suffix(".tmp")
+            tmp.write_text(text, encoding="utf-8")
+            tmp.replace(t)
+        except Exception:
+            pass
 
 
 def now_iso() -> str:
@@ -226,11 +250,12 @@ def home():
 
 @app.get("/api/status")
 def api_status():
-    b = bus_dir()
-    hb = read_json(b / "heartbeat.json") or {}
-    result = read_json(b / "result.json") or {}
-    cmd = read_json(b / "command.json") or {}
-    pending = read_json(b / "pending_approval.json") or {}
+    hb = result = cmd = pending = {}
+    for d in bus_dirs():
+        hb = hb or read_json(d / "heartbeat.json") or {}
+        result = result or read_json(d / "result.json") or {}
+        cmd = cmd or read_json(d / "command.json") or {}
+        pending = pending or read_json(d / "pending_approval.json") or {}
     inst = read_json(data_root() / "install_state.json") or {}
     alive = worker_alive(hb)
     pack = inst.get("WorkerPack") or {}
@@ -292,6 +317,47 @@ def api_run():
     }
     write_json(bus_dir() / "command.json", cmd)
     return jsonify({"ok": True, "command": cmd})
+
+
+@app.post("/api/run-form")
+def api_run_form():
+    script = str(request.form.get("script") or "scan").strip().lower()
+    allowed = {"scan", "repair", "status", "patrol", "digest", "worker"}
+    if script not in allowed:
+        script = "scan"
+    write_json(
+        bus_dir() / "command.json",
+        {
+            "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S"),
+            "Action": script.upper(),
+            "Script": script,
+            "RequestedAt": now_iso(),
+            "TimeoutSec": 180,
+            "Source": "solohost-form",
+        },
+    )
+    return redirect("/")
+
+
+@app.post("/api/accept-form")
+def api_accept_form():
+    write_json(data_root() / "terms_accepted.json", {"Accepted": True, "At": now_iso(), "Version": "1.1"})
+    try:
+        ensure_windows_worker()
+        try_start_windows_worker()
+    except Exception:
+        pass
+    write_json(
+        bus_dir() / "command.json",
+        {
+            "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S"),
+            "Action": "WORKER",
+            "Script": "worker",
+            "RequestedAt": now_iso(),
+            "Source": "terms-form",
+        },
+    )
+    return redirect("/")
 
 
 @app.post("/api/prepare-pack")
