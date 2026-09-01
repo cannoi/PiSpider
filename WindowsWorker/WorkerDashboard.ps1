@@ -1,100 +1,40 @@
 #Requires -Version 5.1
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][string]$WorkerRoot)
+param([Parameter(Mandatory=$true)][string]$WorkerRoot,[int]$Port=18888)
 $ErrorActionPreference='SilentlyContinue'
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-
-function Is-Admin {
-  $id=[Security.Principal.WindowsIdentity]::GetCurrent(); $p=New-Object Security.Principal.WindowsPrincipal($id)
-  return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-}
-
-# Elevate the GUI once; all background Worker processes inherit the elevated token.
-if(-not (Is-Admin)) {
-  $ps=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-  $arg='-NoProfile -ExecutionPolicy Bypass -File "'+$PSCommandPath+'" -WorkerRoot "'+$WorkerRoot+'"'
-  Start-Process $ps -Verb RunAs -ArgumentList $arg -WindowStyle Hidden | Out-Null
-  exit 0
-}
-
-$script:Root=(Resolve-Path -LiteralPath $WorkerRoot).Path
-$script:Live=Join-Path $script:Root 'Data\live'
-if(-not (Test-Path $script:Live)){New-Item -ItemType Directory -Path $script:Live -Force | Out-Null}
-$script:Worker=Join-Path $script:Root 'LiveWorker.ps1'
-$script:MutexName='Global\PiSpider-WorkerDashboard'
-try{$script:GuiMutex=New-Object System.Threading.Mutex($false,$script:MutexName);if(-not $script:GuiMutex.WaitOne(0,$false)){exit 0}}catch{}
-
-function Read-Json($name){
-  try{$p=Join-Path $script:Live $name;if(Test-Path $p){return (Get-Content -LiteralPath $p -Raw -Encoding UTF8|ConvertFrom-Json)}}catch{};return $null
-}
-function Write-Json($name,$obj){try{$p=Join-Path $script:Live $name;$obj|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $p -Encoding UTF8}catch{}}
-function Worker-Running {
-  try{$m=[Threading.Mutex]::OpenExisting('Global\PiSpider-WindowsWorker');$m.Dispose();return $true}catch{return $false}
-}
-function Start-WorkerHidden {
-  if(Worker-Running){return}
-  $ps=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-  $env:PINODE_SPIDER_GUI='1'
-  $a='-NoProfile -ExecutionPolicy Bypass -File "'+$script:Worker+'"'
-  Start-Process $ps -ArgumentList $a -WorkingDirectory $script:Root -WindowStyle Hidden -PassThru | Out-Null
-}
-
-$form=New-Object System.Windows.Forms.Form
-$form.Text='PiSpider Windows Worker'
-$form.StartPosition='CenterScreen';$form.Size=New-Object Drawing.Size(980,700);$form.MinimumSize=New-Object Drawing.Size(900,620)
-$form.BackColor=[Drawing.Color]::FromArgb(20,24,31);$form.ForeColor=[Drawing.Color]::White
-
-$header=New-Object Windows.Forms.Panel;$header.Dock='Top';$header.Height=76;$header.BackColor=[Drawing.Color]::FromArgb(28,34,43);$form.Controls.Add($header)
-$title=New-Object Windows.Forms.Label;$title.Text='PiSpider Windows Worker';$title.Font=New-Object Drawing.Font('Segoe UI',20,[Drawing.FontStyle]::Bold);$title.Location=New-Object Drawing.Point(20,12);$title.AutoSize=$true;$header.Controls.Add($title)
-$state=New-Object Windows.Forms.Label;$state.Text='● AUTO: STARTING';$state.Font=New-Object Drawing.Font('Segoe UI',12,[Drawing.FontStyle]::Bold);$state.Location=New-Object Drawing.Point(650,20);$state.AutoSize=$true;$state.ForeColor=[Drawing.Color]::LimeGreen;$header.Controls.Add($state)
-
-$info=New-Object Windows.Forms.Panel;$info.Dock='Top';$info.Height=95;$info.Padding=New-Object Windows.Forms.Padding(14);$form.Controls.Add($info)
-$cards=@();foreach($t in @('WORKER','ACTIVITY','CURRENT','LAST RESULT')){$l=New-Object Windows.Forms.Label;$l.Text=$t+'`r`n—';$l.Font=New-Object Drawing.Font('Segoe UI',10);$l.AutoSize=$false;$l.TextAlign='MiddleLeft';$l.Padding=New-Object Windows.Forms.Padding(10);$l.BorderStyle='FixedSingle';$l.Size=New-Object Drawing.Size(220,70);$l.Location=New-Object Drawing.Point((14+($cards.Count*235)),12);$info.Controls.Add($l);$cards+=$l}
-
-$tabs=New-Object Windows.Forms.TabControl;$tabs.Dock='Fill';$form.Controls.Add($tabs)
-$tabNow=New-Object Windows.Forms.TabPage;$tabNow.Text='Live';$tabNow.BackColor=$form.BackColor;$tabs.TabPages.Add($tabNow)
-$tabQueue=New-Object Windows.Forms.TabPage;$tabQueue.Text='Commands';$tabQueue.BackColor=$form.BackColor;$tabs.TabPages.Add($tabQueue)
-$tabSet=New-Object Windows.Forms.TabPage;$tabSet.Text='Settings';$tabSet.BackColor=$form.BackColor;$tabs.TabPages.Add($tabSet)
-
-$grid=New-Object Windows.Forms.ListView;$grid.Dock='Fill';$grid.View='Details';$grid.FullRowSelect=$true;$grid.GridLines=$true;$grid.BackColor=[Drawing.Color]::FromArgb(24,29,37);$grid.ForeColor=[Drawing.Color]::White
-[void]$grid.Columns.Add('TIME',155);[void]$grid.Columns.Add('PROCESS / COMMAND',190);[void]$grid.Columns.Add('STATE',100);[void]$grid.Columns.Add('RESULT / ERROR',450);$tabNow.Controls.Add($grid)
-
-$cmdBox=New-Object Windows.Forms.TextBox;$cmdBox.Multiline=$true;$cmdBox.Dock='Fill';$cmdBox.ReadOnly=$true;$cmdBox.ScrollBars='Vertical';$cmdBox.BackColor=[Drawing.Color]::FromArgb(24,29,37);$cmdBox.ForeColor=[Drawing.Color]::White;$cmdBox.Font=New-Object Drawing.Font('Consolas',10);$tabQueue.Controls.Add($cmdBox)
-
-$setPanel=New-Object Windows.Forms.FlowLayoutPanel;$setPanel.Dock='Top';$setPanel.Height=180;$setPanel.Padding=New-Object Windows.Forms.Padding(15);$setPanel.FlowDirection='TopDown';$tabSet.Controls.Add($setPanel)
-$pathLabel=New-Object Windows.Forms.Label;$pathLabel.Text='Worker: '+$script:Worker;$pathLabel.AutoSize=$true;$setPanel.Controls.Add($pathLabel)
-$buttons=@(
-  @('Restart Worker','restart'),@('Open Worker Folder','folder'),@('Open Live Data','live'),@('Open Config','config'),@('Test SoloHost','test')
-)
-foreach($b in $buttons){$bt=New-Object Windows.Forms.Button;$bt.Text=$b[0];$bt.Tag=$b[1];$bt.Width=240;$bt.Height=34;$setPanel.Controls.Add($bt);$bt.Add_Click({
-  switch($this.Tag){
-   'restart'{try{Get-Process powershell -ErrorAction SilentlyContinue|Where-Object {$_.Path -eq $null}|Out-Null}catch{};Start-WorkerHidden}
-   'folder'{Start-Process explorer.exe -ArgumentList ('"'+$script:Root+'"')}
-   'live'{Start-Process explorer.exe -ArgumentList ('"'+$script:Live+'"')}
-   'config'{Start-Process notepad.exe -ArgumentList ('"'+(Join-Path $script:Root 'Config.json')+'"')}
-   'test'{try{Invoke-RestMethod 'http://127.0.0.1:18770/api/worker-check' -TimeoutSec 3|Out-Null;[Windows.Forms.MessageBox]::Show('SoloHost responded.','PiSpider')}catch{[Windows.Forms.MessageBox]::Show('SoloHost did not respond on 18770.','PiSpider')}}
+function Is-Admin { $id=[Security.Principal.WindowsIdentity]::GetCurrent(); $p=New-Object Security.Principal.WindowsPrincipal($id); $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) }
+if(-not (Is-Admin)){ $ps=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'; $a='-NoProfile -ExecutionPolicy Bypass -File "'+$PSCommandPath+'" -WorkerRoot "'+$WorkerRoot+'" -Port '+$Port; Start-Process $ps -Verb RunAs -ArgumentList $a -WindowStyle Hidden | Out-Null; exit 0 }
+$Root=(Resolve-Path -LiteralPath $WorkerRoot).Path; $Live=Join-Path $Root 'Data\live'; New-Item -ItemType Directory -Force -Path $Live | Out-Null
+$mutex=$null; try{$mutex=New-Object System.Threading.Mutex($false,'Global\PiSpider-WorkerDashboardWeb');if(-not $mutex.WaitOne(0,$false)){exit 0}}catch{}
+function Read-J($name){try{$p=Join-Path $Live $name;if(Test-Path -LiteralPath $p){return Get-Content -LiteralPath $p -Raw -Encoding UTF8 | ConvertFrom-Json}}catch{};return $null}
+function Write-J($name,$obj){try{$p=Join-Path $Live $name;$tmp="$p.tmp";[IO.File]::WriteAllText($tmp,($obj|ConvertTo-Json -Depth 10),(New-Object Text.UTF8Encoding($false)));Move-Item $tmp $p -Force}catch{}}
+function State { $hb=Read-J 'heartbeat.json';$p=Read-J 'worker_progress.json';$r=Read-J 'result.json';$c=Read-J 'command.json';$last=Read-J 'command.last.json';$auto=Read-J 'autonomous.json';$logs=@(); foreach($f in @('worker.stdout.log','worker.stderr.log')){ $fp=Join-Path $Live $f;if(Test-Path $fp){try{$logs += @{File=$f;Lines=@(Get-Content $fp -Tail 40)}}catch{}}}; [ordered]@{heartbeat=$hb;progress=$p;result=$r;command=$c;lastCommand=$last;autonomous=$auto;logs=$logs;workerRoot=$Root;live=$Live;serverAt=(Get-Date).ToString('o')} }
+$html=@'
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PiSpider Windows Worker</title><style>
+:root{font-family:Segoe UI,system-ui,sans-serif;color:#eef2f6;background:#12171e}*{box-sizing:border-box}body{margin:0}.wrap{max-width:1120px;margin:auto;padding:16px}.card{background:#1b222c;border:1px solid #2b3542;border-radius:12px;padding:16px;margin:10px 0}h1,h2,h3{margin:0 0 8px}.muted{color:#9aa7b5}.ok{color:#58d68d}.bad{color:#ff6b6b}.warn{color:#f5c451}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.metric{background:#141a21;border:1px solid #2b3542;border-radius:10px;padding:12px;min-height:76px}.metric b{display:block;color:#9aa7b5;font-size:11px;text-transform:uppercase}.metric div{margin-top:7px;font-weight:700}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}button{border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer;background:#2a3440;color:#fff;margin:4px}.primary{background:#176b4d} .danger{background:#a52a2a}.bar{height:9px;background:#293340;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;width:0;background:#58d68d;transition:width .2s}pre{white-space:pre-wrap;overflow:auto;background:#11161c;border:1px solid #293340;border-radius:8px;padding:12px;font:12px Consolas,monospace;line-height:1.45}.log{max-height:360px;overflow:auto}.logrow{display:grid;grid-template-columns:160px 110px 120px 1fr;gap:8px;padding:8px;border-bottom:1px solid #28313c;font:12px Consolas,monospace}@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.logrow{grid-template-columns:1fr}}
+</style></head><body><div class="wrap"><div class="card"><div class="row"><div style="flex:1"><h1>PiSpider Windows Worker</h1><div id="conn" class="muted">Connecting…</div></div><b id="auto">● AUTO</b></div></div><div class="grid"><div class="metric"><b>Worker</b><div id="worker">—</div></div><div class="metric"><b>Activity</b><div id="activity">—</div></div><div class="metric"><b>Current</b><div id="current">—</div></div><div class="metric"><b>Last Result</b><div id="result">—</div></div></div><div class="card"><h3>NOW / DONE / NEXT</h3><pre id="story">Loading…</pre><div class="bar"><i id="bar"></i></div></div><div class="card"><h3>Commands from SoloHost</h3><div class="row"><button onclick="send('RUN')" class="primary">RUN — AUTONOMOUS</button><button onclick="send('SCAN')">SCAN</button><button onclick="send('STATUS')">STATUS</button><button onclick="send('PATROL')">PATROL</button><button onclick="send('REPAIR')" class="danger">REPAIR</button></div><pre id="cmd">No command.</pre></div><div class="card"><h3>Execution / Worker log</h3><div id="log" class="log"></div></div><div class="card"><h3>Settings</h3><div id="paths" class="muted"></div><button onclick="location.reload()">Reconnect</button></div></div><script>
+let lastEvent=0;const $=x=>document.getElementById(x);function esc(v){return String(v??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}function render(s){const h=s.heartbeat||{},p=s.progress||{},r=s.result||{},c=s.command||s.lastCommand||{},a=s.autonomous||{};const alive=h.At&&((Date.now()-new Date(h.At).getTime())<45000);$('conn').textContent=alive?'CONNECTED • heartbeat '+Math.max(0,Math.round((Date.now()-new Date(h.At).getTime())/100)/10)+'s ago':'DISCONNECTED';$('conn').className=alive?'ok':'bad';$('worker').textContent=alive?'ONLINE':'OFFLINE';$('worker').className=alive?'ok':'bad';$('activity').textContent=h.Busy?(h.Note||p.Action||'WORKING'):(a.Active?'AUTO • WAITING':'IDLE');$('current').textContent=p.Action?(p.Action+' — '+p.Phase+' ('+(p.Percent||0)+'%)'):'Waiting';$('result').textContent=r.Status?(r.Status+' | '+r.Action+' | '+(r.Summary||'')):'—';$('bar').style.width=Math.max(0,Math.min(100,Number(p.Percent||0)))+'%';$('story').textContent=['=== NOW ===',h.Busy?((p.Action||h.Note||'WORKING')+' — '+(p.Phase||'RUNNING')):'Worker online — waiting','Heartbeat: '+(h.At||'—'),'','=== DONE ===',r.Action?(r.Action+' | '+(r.Status||'')+' | '+(r.Summary||'')):'No completed action yet','','=== NEXT ===',c.Action?('Queued: '+c.Action):(a.Active?'Continue autonomous schedule':'Waiting for SoloHost')].join('\n');$('cmd').textContent=['Command: '+(c.Action||'—'),'ID: '+(c.Id||'—'),'Phase: '+(p.Phase||'—'),'Detail: '+(p.Detail||'—'),'Result: '+(r.Status||'—')+' | '+(r.Summary||'—')].join('\n');$('paths').textContent='Worker: '+s.workerRoot+'\nLive: '+s.live;let rows=[];(s.logs||[]).forEach(x=>x.Lines.forEach(line=>rows.push('<div class="logrow"><span>'+esc(x.File)+'</span><span>LOG</span><span>—</span><span>'+esc(line)+'</span></div>'));if(p.Action)rows.unshift('<div class="logrow"><span>'+esc(p.At||'')+'</span><b>PROGRESS</b><span>'+esc(p.Phase||'')+'</span><span>'+esc(p.Detail||'')+' ('+(p.Percent||0)+'%)</span></div>');if(r.Action)rows.unshift('<div class="logrow"><span>'+esc(r.At||'')+'</span><b>RESULT</b><span>'+esc(r.Status||'')+'</span><span>'+esc(r.Summary||'')+'</span></div>');$('log').innerHTML=rows.join('')||'<div class="muted">No log yet.</div>';}
+async function pull(){try{const r=await fetch('/api/status',{cache:'no-store'});render(await r.json())}catch(e){$('conn').textContent='DISCONNECTED • '+e.message;$('conn').className='bad'}}async function send(a){try{const r=await fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a})});const j=await r.json();if(!j.ok)alert(j.error||'Command failed')}catch(e){alert(e.message)}}function stream(){try{const es=new EventSource('/events');es.onmessage=e=>{try{render(JSON.parse(e.data));lastEvent=Date.now()}catch(_){}};es.onerror=()=>{es.close();setTimeout(stream,1500)}}catch(_){setTimeout(stream,1500)}}pull();setInterval(pull,3000);stream();
+</script></body></html>
+'@
+function Reply($ctx,$status,$content,$type='text/plain; charset=utf-8'){$b=[Text.Encoding]::UTF8.GetBytes($content);$ctx.Response.StatusCode=$status;$ctx.Response.ContentType=$type;$ctx.Response.ContentLength64=$b.Length;$ctx.Response.OutputStream.Write($b,0,$b.Length);$ctx.Response.Close()}
+function JsonState { return ((State)|ConvertTo-Json -Depth 12 -Compress) }
+function Handle($ctx){$path=$ctx.Request.Url.AbsolutePath
+ if($path -eq '/' -or $path -eq '/index.html'){Reply $ctx 200 $html 'text/html; charset=utf-8';return}
+ if($path -eq '/api/status'){Reply $ctx 200 (JsonState) 'application/json; charset=utf-8';return}
+ if($path -eq '/api/command' -and $ctx.Request.HttpMethod -eq 'POST'){try{$sr=New-Object IO.StreamReader($ctx.Request.InputStream);$j=$sr.ReadToEnd()|ConvertFrom-Json;$act=([string]$j.action).ToUpper();if($act -notin @('RUN','SCAN','STATUS','PATROL','REPAIR','DIGEST','WATCH')){throw 'Unsupported action'};$id=[guid]::NewGuid().ToString();$obj=[ordered]@{Id=$id;Action=$act;CreatedAt=(Get-Date).ToString('o');Source='WorkerDashboardWeb'};Write-J 'command.json' $obj;Reply $ctx 200 (@{ok=$true;command=$obj}|ConvertTo-Json -Depth 6) 'application/json; charset=utf-8'}catch{Reply $ctx 400 (@{ok=$false;error=$_.Exception.Message}|ConvertTo-Json) 'application/json; charset=utf-8'};return}
+ if($path -eq '/events'){$ctx.Response.StatusCode=200;$ctx.Response.ContentType='text/event-stream';$ctx.Response.Headers.Add('Cache-Control','no-cache');$ctx.Response.SendChunked=$true;$ctx.Response.KeepAlive=$true;$last='';try{while($true){$j=JsonState;if($j -ne $last){$line='data: '+$j+'`n`n';$b=[Text.Encoding]::UTF8.GetBytes($line);$ctx.Response.OutputStream.Write($b,0,$b.Length);$ctx.Response.OutputStream.Flush();$last=$j};Start-Sleep -Milliseconds 750}}catch{}finally{try{$ctx.Response.Close()}catch{}};return}
+ Reply $ctx 404 'Not Found'}
+# Start the existing Windows Worker hidden; the dashboard is only its UI surface.
+$liveWorker=Join-Path $Root 'LiveWorker.ps1'
+try {
+  $m=[Threading.Mutex]::OpenExisting('Global\PiSpider-WindowsWorker'); $m.Dispose()
+} catch {
+  if(Test-Path -LiteralPath $liveWorker){
+    $ps=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    Start-Process $ps -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -File "'+$liveWorker+'"') -WorkingDirectory $Root -WindowStyle Hidden | Out-Null
   }
-})}
-
-$timer=New-Object Windows.Forms.Timer;$timer.Interval=1000
-$script:lastCmdId='';$script:lastResultAt='';$script:startedAt=Get-Date
-$timer.Add_Tick({
-  if(-not (Worker-Running)){Start-WorkerHidden}
-  $hb=Read-Json 'heartbeat.json';$cmd=Read-Json 'command.json';$last=Read-Json 'command.last.json';$res=Read-Json 'result.json';$prog=Read-Json 'worker_progress.json';$auto=Read-Json 'autonomous.json'
-  $alive=$false;if($hb -and $hb.At){try{$alive=((Get-Date)-([datetime]$hb.At)).TotalSeconds -lt 45}catch{}}
-  $cards[0].Text='WORKER`r`n'+$(if($alive){'ONLINE'}else{'STARTING / OFFLINE'})
-  $cards[1].Text='ACTIVITY`r`n'+$(if($hb.Busy){$hb.Note}else{'IDLE'})
-  $cards[2].Text='CURRENT`r`n'+$(if($prog){$prog.Action+' — '+$prog.Phase}else{'Waiting for command'})
-  $cards[3].Text='LAST RESULT`r`n'+$(if($res){$res.Status+' | '+$res.Action}else{'—'})
-  if($auto -and $auto.Active){$state.Text='● AUTO: ON'}else{$state.Text='● AUTO: READY'}
-  $grid.Items.Clear()
-  if($prog){$it=$grid.Items.Add([string]$prog.At);[void]$it.SubItems.Add([string]$prog.Action);[void]$it.SubItems.Add([string]$prog.Phase);[void]$it.SubItems.Add([string]$prog.Detail)}
-  if($res){$it=$grid.Items.Add([string]$res.At);[void]$it.SubItems.Add([string]$res.Action);[void]$it.SubItems.Add([string]$res.Status);[void]$it.SubItems.Add([string]$res.Summary)}
-  if($cmd){$it=$grid.Items.Add([string]$cmd.CreatedAt);[void]$it.SubItems.Add([string]$cmd.Action);[void]$it.SubItems.Add('RECEIVED');[void]$it.SubItems.Add('From SoloHost: '+[string]$cmd.Id)}
-  $txt=@('SoloHost command: '+$(if($cmd){$cmd.Action}else{$last.Action}), 'Command ID: '+$(if($cmd){$cmd.Id}else{$last.Id}), 'Worker: '+$(if($alive){'ONLINE'}else{'OFFLINE'}), 'Busy: '+$(if($hb){$hb.Busy}else{$false}), 'Progress: '+$(if($prog){$prog.Phase+' | '+$prog.Detail}else{'—'}), 'Last result: '+$(if($res){$res.Status+' | '+$res.Summary}else{'—'}))
-  $cmdBox.Lines=$txt
-})
-$form.Add_Shown({Start-WorkerHidden;$timer.Start()})
-$form.Add_FormClosing({$timer.Stop()})
-[void]$form.ShowDialog()
+}
+$listener=New-Object Net.HttpListener;$listener.Prefixes.Add("http://127.0.0.1:$Port/");try{$listener.Start()}catch{exit 2}
+try{while($listener.IsListening){$ctx=$listener.GetContext();Start-Job -ScriptBlock {param($c,$r,$h);# jobs cannot safely marshal HttpListenerContext; intentionally unused
+} -ArgumentList $null,$Root,$html | Out-Null; Handle $ctx}}finally{try{$listener.Stop();$listener.Close()}catch{}}

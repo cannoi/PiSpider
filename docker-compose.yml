@@ -19,6 +19,7 @@ services:
       PISPIDER_DATA: /data
       SOLOHOST_CONFIG: /solohost-config
       TZ: Asia/Ho_Chi_Minh
+      PISPIDER_WORKER_UI_URL: http://host.docker.internal:18888
     extra_hosts:
       - "host.docker.internal:host-gateway"
     mem_limit: 128m
