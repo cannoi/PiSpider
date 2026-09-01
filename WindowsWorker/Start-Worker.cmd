@@ -1,21 +1,11 @@
 @echo off
 setlocal
-chcp 65001 >nul
-set "BOOT=%~dp0Bootstrap-Worker.ps1"
-if not exist "%BOOT%" (
-  echo PiSpider Worker bootstrap not found.
+set "UI=%~dp0WorkerDashboard.ps1"
+if not exist "%UI%" (
+  echo WorkerDashboard.ps1 not found.
   pause
   exit /b 1
 )
-echo.
-echo ============================================================
-echo PiSpider Windows Worker - automatic discovery
- echo ============================================================
-echo It will find WindowsWorker\LiveWorker.ps1 under:
-echo %%APPDATA%%\Pi Network\pi-apps\
-echo.
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%BOOT%"
-echo.
-echo Worker stopped. ExitCode=%ERRORLEVEL%
-pause
+start "PiSpider Worker" "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -STA -NoProfile -ExecutionPolicy Bypass -File "%UI%"
 endlocal
+exit /b 0

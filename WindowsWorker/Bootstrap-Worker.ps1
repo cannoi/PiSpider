@@ -40,9 +40,16 @@ $env:PINODE_SPIDER_ROOT = $workerRoot
 Write-Host "[BOOT] PiSpider Worker found: $workerRoot" -ForegroundColor Green
 Write-Host "[BOOT] SoloHost app root: $appRoot"
 
+$ui = Join-Path $workerRoot 'WorkerDashboard.ps1'
 $live = Join-Path $workerRoot 'LiveWorker.ps1'
-$args = @('-NoProfile','-ExecutionPolicy','Bypass','-File',$live)
+$ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+if (Test-Path -LiteralPath $ui) {
+    Write-Host '[BOOT] Opening Worker dashboard (consoles stay hidden)...' -ForegroundColor Cyan
+    Start-Process -FilePath $ps -ArgumentList @('-STA','-NoProfile','-ExecutionPolicy','Bypass','-File', $ui) | Out-Null
+    exit 0
+}
+$args = @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',$live)
 if ($Once) { $args += '-Once' }
-Write-Host '[BOOT] Starting LiveWorker...' -ForegroundColor Cyan
-& powershell.exe @args
-exit $LASTEXITCODE
+Write-Host '[BOOT] Dashboard missing — starting hidden LiveWorker.' -ForegroundColor Yellow
+Start-Process -FilePath $ps -ArgumentList $args -WindowStyle Hidden | Out-Null
+exit 0
