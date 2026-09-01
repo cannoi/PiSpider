@@ -84,6 +84,55 @@ Write-Host "[WORKER] PiSpider Hybrid Worker  root=$($script:SpiderRoot)"
 Write-Host "[WORKER] Bus=$(Get-SpiderLiveBusDir)"
 Write-Host "[WORKER] Poll=${PollSeconds}s   Activate by Core command.json"
 
+function Get-CoreHeartbeatUrls {
+    $ports = New-Object System.Collections.Generic.List[int]
+    # Prefer the SoloHost port declared by the app config, then known legacy/current ports.
+    foreach ($file in @((Join-Path (Split-Path -Parent $script:SpiderRoot) 'config.json'), (Join-Path $script:SpiderRoot 'config.json'))) {
+        if (Test-Path -LiteralPath $file) {
+            try {
+                $cfg = Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json
+                $port = 0
+                try { $port = [int]$cfg.Port } catch {}
+                if ($port -gt 0 -and -not $ports.Contains($port)) { [void]$ports.Add($port) }
+            } catch {}
+        }
+    }
+    foreach ($port in @(18770,18780)) {
+        if (-not $ports.Contains($port)) { [void]$ports.Add($port) }
+    }
+    foreach ($port in $ports) {
+        "http://127.0.0.1:$port/api/worker-heartbeat"
+    }
+}
+
+function Send-CoreHeartbeat {
+    param([bool]$Busy = $false, [string]$Note = '')
+    # File LiveBus remains the primary channel. Localhost HTTP is a second path so
+    # SoloHost can verify a Worker even when Docker/Windows mount paths differ.
+    $payload = [ordered]@{
+        Alive = $true
+        Busy = $Busy
+        At = (Get-Date).ToString('o')
+        Pack = 'windows-worker'
+        Note = $Note
+        Pid = $PID
+        Root = $script:SpiderRoot
+    }
+    $json = $payload | ConvertTo-Json -Depth 5 -Compress
+    foreach ($uri in (Get-CoreHeartbeatUrls)) {
+        try {
+            Invoke-RestMethod -Uri $uri -Method Post -ContentType 'application/json' -Body $json -TimeoutSec 3 -ErrorAction Stop | Out-Null
+            break
+        } catch { }
+    }
+}
+
+function Write-WorkerHeartbeat {
+    param([bool]$Busy = $false, [string]$Note = '')
+    Write-SpiderLiveHeartbeat -Busy $Busy -Note $Note
+    Send-CoreHeartbeat -Busy $Busy -Note $Note
+}
+
 function Invoke-LiveAction {
     param([string]$Action)
     $map = @{
@@ -99,7 +148,7 @@ function Invoke-LiveAction {
         Write-SpiderLiveResult -Action $Action -Status 'SKIP' -Summary "Unknown action $Action"
         return
     }
-    Write-SpiderLiveHeartbeat -Busy $true -Note $cmd
+    Write-WorkerHeartbeat -Busy $true -Note $cmd
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $p = Start-Process -FilePath $ps -ArgumentList @(
         '-NoProfile','-ExecutionPolicy','Bypass','-File', $main, '-Command', $cmd, '-Quiet'
@@ -118,14 +167,14 @@ function Invoke-LiveAction {
         } catch {}
     }
     Write-SpiderLiveResult -Action $Action -Status $(if ($code -eq 0) { 'OK' } else { 'FAIL' }) -Summary $summary -Health $health
-    Write-SpiderLiveHeartbeat -Busy $false -Note 'idle'
+    Write-WorkerHeartbeat -Busy $false -Note 'idle'
 }
 
-Write-SpiderLiveHeartbeat -Busy $false -Note 'waiting'
+Write-WorkerHeartbeat -Busy $false -Note 'waiting'
 $lastId = ''
 while ($true) {
     try {
-        Write-SpiderLiveHeartbeat -Busy $false -Note 'waiting'
+        Write-WorkerHeartbeat -Busy $false -Note 'waiting'
         $cmd = Read-SpiderLiveCommand
         if ($cmd -and $cmd.Id -and $cmd.Id -ne $lastId) {
             $act = ([string]$cmd.Action).ToUpper()

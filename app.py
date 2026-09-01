@@ -242,6 +242,32 @@ def worker_alive(hb: dict | None) -> bool:
     except Exception:
         return bool(hb.get("Alive"))
 
+def all_bus_dirs() -> list[Path]:
+    """Return every mounted LiveBus location, including the SoloHost app mount."""
+    dirs = []
+    candidates = [
+        worker_dir() / "Data" / "live",
+        data_root() / "live",
+        app_root() / "data" / "live",
+        app_root() / "Data" / "live",
+    ]
+    # Also discover a Worker placed one level below the mounted app root.
+    try:
+        root = app_root()
+        for w in root.glob("*/WindowsWorker/Data/live"):
+            candidates.append(w)
+        candidates.append(root / "WindowsWorker" / "Data" / "live")
+    except Exception:
+        pass
+    for d in candidates:
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            if d not in dirs:
+                dirs.append(d)
+        except Exception:
+            continue
+    return dirs or [data_root() / "live"]
+
 
 @app.get("/")
 def home():
@@ -386,23 +412,49 @@ def api_accept_terms():
 
 @app.get("/api/worker-check")
 def api_worker_check():
-    """Read-only verification. A worker is active only when a fresh heartbeat exists."""
+    """Read-only verification. Accept only a fresh heartbeat from the Windows Worker."""
     hb = result = {}
-    for d in bus_dirs():
-        hb = hb or read_json(d / "heartbeat.json") or {}
-        result = result or read_json(d / "result.json") or {}
+    heartbeat_source = None
+    for d in all_bus_dirs():
+        candidate = read_json(d / "heartbeat.json") or {}
+        if candidate and not hb:
+            hb = candidate
+            heartbeat_source = str(d / "heartbeat.json")
+        r = read_json(d / "result.json") or {}
+        if r and not result:
+            result = r
     alive = worker_alive(hb)
-    return jsonify(
-        {
-            "ok": True,
-            "workerAlive": alive,
-            "workerBusy": bool(hb.get("Busy")),
-            "heartbeat": hb,
-            "lastResult": result,
-            "verifiedAt": now_iso(),
-            "verification": "PASS" if alive else "WAITING",
-        }
-    )
+    return jsonify({
+        "ok": True,
+        "workerAlive": alive,
+        "workerBusy": bool(hb.get("Busy")),
+        "heartbeat": hb,
+        "heartbeatSource": heartbeat_source,
+        "lastResult": result,
+        "verifiedAt": now_iso(),
+        "verification": "PASS" if alive else "WAITING",
+        "reason": ("Fresh heartbeat received from Windows Worker." if alive else
+                   "No fresh heartbeat received. The Worker may be running in a different Pi Network app folder or SoloHost may not be mounting that folder."),
+    })
+
+@app.post("/api/worker-heartbeat")
+def api_worker_heartbeat():
+    """Receive a local Windows Worker heartbeat as a second, reliable transport path."""
+    body = request.get_json(silent=True) or {}
+    if not body.get("Alive") or body.get("Pack") != "windows-worker":
+        return jsonify({"ok": False, "error": "invalid worker heartbeat"}), 400
+    hb = {
+        "Alive": True,
+        "Busy": bool(body.get("Busy")),
+        "At": body.get("At") or now_iso(),
+        "Pack": "windows-worker",
+        "Note": str(body.get("Note") or ""),
+        "Pid": body.get("Pid"),
+        "Root": str(body.get("Root") or ""),
+        "Transport": "http-localhost",
+    }
+    write_json(data_root() / "live" / "heartbeat.json", hb)
+    return jsonify({"ok": True, "workerAlive": True, "heartbeat": hb})
 
 
 @app.post("/api/activate")
