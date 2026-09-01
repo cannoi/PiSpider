@@ -3,7 +3,7 @@
 # Reads Data\live\command.json written by SoloHost Core
 [CmdletBinding()]
 param(
-    [int]$PollSeconds = 15,
+    [int]$PollSeconds = 2,
     [switch]$Once
 )
 
@@ -115,6 +115,23 @@ function Get-CoreHeartbeatUrls {
     }
 }
 
+function Send-CoreEvent {
+    param([string]$Type, [hashtable]$Payload)
+    $body = [ordered]@{ Type=$Type; Pack='windows-worker' }
+    foreach($k in $Payload.Keys){ $body[$k]=$Payload[$k] }
+    $json = $body | ConvertTo-Json -Depth 8 -Compress
+    foreach ($uri in (Get-CoreEventUrls)) {
+        try { Invoke-RestMethod -Uri $uri -Method Post -ContentType 'application/json' -Body $json -TimeoutSec 1 -ErrorAction Stop | Out-Null; break } catch {}
+    }
+}
+function Get-CoreEventUrls {
+    $ports = New-Object System.Collections.Generic.List[int]
+    $envPort=0; try{$envPort=[int]$env:PISPIDER_SOLOHOST_PORT}catch{}
+    if($envPort -gt 0){[void]$ports.Add($envPort)}
+    foreach($port in @(18770,18780)){if(-not $ports.Contains($port)){[void]$ports.Add($port)}}
+    foreach($port in $ports){ "http://127.0.0.1:$port/api/worker-event" }
+}
+
 function Send-CoreHeartbeat {
     param([bool]$Busy = $false, [string]$Note = '')
     # File LiveBus remains the primary channel. Localhost HTTP is a second path so
@@ -131,10 +148,11 @@ function Send-CoreHeartbeat {
     $json = $payload | ConvertTo-Json -Depth 5 -Compress
     foreach ($uri in (Get-CoreHeartbeatUrls)) {
         try {
-            Invoke-RestMethod -Uri $uri -Method Post -ContentType 'application/json' -Body $json -TimeoutSec 3 -ErrorAction Stop | Out-Null
+            Invoke-RestMethod -Uri $uri -Method Post -ContentType 'application/json' -Body $json -TimeoutSec 1 -ErrorAction Stop | Out-Null
             break
         } catch { }
     }
+    try { Send-CoreEvent -Type 'HEARTBEAT' -Payload @{Alive=$true;Busy=$Busy;At=$payload.At;Note=$Note;Pid=$PID;Root=$script:SpiderRoot} } catch {}
 }
 
 function Write-WorkerHeartbeat {
@@ -145,11 +163,15 @@ function Write-WorkerHeartbeat {
 
 function Write-WorkerProgress {
     param([string]$Action,[string]$Phase,[string]$Detail='',[int]$Percent=0)
-    try { Write-SpiderLiveJson -Name 'worker_progress.json' -Object ([ordered]@{Action=$Action;Phase=$Phase;Detail=$Detail;Percent=$Percent;At=(Get-Date).ToString('o');Pid=$PID}) } catch {}
+    $at=(Get-Date).ToString('o'); $obj=[ordered]@{Action=$Action;Phase=$Phase;Detail=$Detail;Percent=$Percent;At=$at;Pid=$PID}
+    try { Write-SpiderLiveJson -Name 'worker_progress.json' -Object $obj } catch {}
+    try { Send-CoreEvent -Type 'PROGRESS' -Payload @{Action=$Action;Phase=$Phase;Detail=$Detail;Percent=$Percent;At=$at;Pid=$PID} } catch {}
 }
 function Write-WorkerState {
     param([bool]$Active=$true,[string]$Mode='AUTO',[string]$Note='')
-    try { Write-SpiderLiveJson -Name 'worker_state.json' -Object ([ordered]@{Active=$Active;Mode=$Mode;Note=$Note;At=(Get-Date).ToString('o');Pid=$PID}) } catch {}
+    $at=(Get-Date).ToString('o'); $obj=[ordered]@{Active=$Active;Mode=$Mode;Note=$Note;At=$at;Pid=$PID}
+    try { Write-SpiderLiveJson -Name 'worker_state.json' -Object $obj } catch {}
+    try { Send-CoreEvent -Type 'STATE' -Payload @{Active=$Active;Mode=$Mode;Note=$Note;At=$at;Pid=$PID} } catch {}
 }
 
 function Invoke-LiveAction {
@@ -208,7 +230,9 @@ function Invoke-LiveAction {
             if ($j.Decision.Action) { $summary = "decision=$($j.Decision.Action) health=$health" }
         } catch {}
     }
-    Write-SpiderLiveResult -Action $Action -Status $(if ($code -eq 0) { 'OK' } else { 'FAIL' }) -Summary $summary -Health $health
+    $finalStatus = if ($code -eq 0) { 'OK' } else { 'FAIL' }
+    Write-SpiderLiveResult -Action $Action -Status $finalStatus -Summary $summary -Health $health
+    try { Send-CoreEvent -Type 'RESULT' -Payload @{Action=$Action;Status=$finalStatus;Summary=$summary;Health=$health;At=(Get-Date).ToString('o');Pid=$PID} } catch {}
     Write-WorkerProgress -Action $Action -Phase 'DONE' -Detail $summary -Percent 100
     Write-WorkerHeartbeat -Busy $false -Note 'idle'
     Write-WorkerState -Active $true -Mode 'AUTO' -Note 'idle'
@@ -248,5 +272,5 @@ while ($true) {
         Write-Host "[WORKER] $($_.Exception.Message)"
     }
     if ($Once) { break }
-    Start-Sleep -Seconds ([Math]::Max(5, $PollSeconds))
+    Start-Sleep -Seconds ([Math]::Max(2, $PollSeconds))
 }

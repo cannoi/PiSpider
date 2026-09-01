@@ -1,228 +1,45 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>PiSpider Hybrid</title>
 <style>
-:root{font-family:Segoe UI,system-ui,sans-serif;color:#1f2937;background:#f4f6f8}
-*{box-sizing:border-box} body{margin:0}.wrap{max-width:900px;margin:auto;padding:20px}
-.card{background:#fff;border:1px solid #dfe3e8;border-radius:14px;padding:20px;margin:14px 0;box-shadow:0 2px 8px #0000000a}
-h1{margin:0 0 8px;font-size:30px}h2{margin:0 0 10px}h3{margin:18px 0 8px}
-.muted{color:#667085}.ok{color:#087443}.warn{color:#a15c00}.bad{color:#b42318}
-button{border:0;border-radius:9px;padding:12px 16px;font-size:15px;font-weight:650;cursor:pointer;margin:5px 5px 5px 0}
-.primary{background:#176b4d;color:#fff}.secondary{background:#eef1f4}.danger{background:#b42318;color:#fff}
-pre{white-space:pre-wrap;overflow:auto;background:#f7f8fa;border-radius:9px;padding:12px;font-size:13px;line-height:1.5}
-.code{user-select:all}.step{display:flex;gap:12px;margin:12px 0}.num{min-width:30px;height:30px;border-radius:50%;background:#e8f2ee;display:grid;place-items:center;font-weight:700}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.metric{padding:14px;background:#f7f8fa;border-radius:10px}
-.hidden{display:none}.status{font-weight:700}.skeleton{opacity:.7}.instant{content-visibility:auto}
-@media(max-width:650px){.grid{grid-template-columns:1fr}.wrap{padding:12px}}
+:root{font-family:Segoe UI,system-ui,sans-serif;color:#eef2f6;background:#12171e}*{box-sizing:border-box}body{margin:0}.wrap{max-width:1120px;margin:auto;padding:16px}.card{background:#1b222c;border:1px solid #2b3542;border-radius:12px;padding:16px;margin:10px 0}h1{margin:0 0 5px;font-size:27px}h2,h3{margin:0 0 10px}.muted{color:#9aa7b5}.ok{color:#58d68d}.warn{color:#f5c451}.bad{color:#ff6b6b}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.metric{background:#141a21;border:1px solid #2b3542;border-radius:10px;padding:12px;min-height:76px}.metric b{display:block;color:#9aa7b5;font-size:12px;text-transform:uppercase;letter-spacing:.04em}.metric div{margin-top:7px;font-weight:700}.tabs{display:flex;gap:6px;margin:10px 0}.tab{background:#222b36;color:#dfe6ed;border:1px solid #344050;border-radius:8px;padding:9px 14px;cursor:pointer}.tab.active{background:#176b4d;color:#fff}.pane{display:none}.pane.active{display:block}button{border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer;margin:4px 5px 4px 0}.primary{background:#176b4d;color:#fff}.secondary{background:#2a3440;color:#fff}.danger{background:#a52a2a;color:#fff}button:disabled{opacity:.5;cursor:wait}pre{white-space:pre-wrap;overflow:auto;background:#11161c;border:1px solid #293340;border-radius:8px;padding:12px;font:12px Consolas,monospace;line-height:1.45}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.bar{height:8px;background:#293340;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;width:0;background:#58d68d;transition:width .2s}.log{max-height:330px;overflow:auto}.logrow{display:grid;grid-template-columns:170px 120px 110px 1fr;gap:8px;padding:8px;border-bottom:1px solid #28313c;font:12px Consolas,monospace}.step{display:flex;gap:10px;margin:10px 0}.num{min-width:28px;height:28px;border-radius:50%;background:#26382f;display:grid;place-items:center;font-weight:700}.hidden{display:none}@media(max-width:800px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.logrow{grid-template-columns:1fr}.wrap{padding:10px}}
 </style>
 </head>
-<body>
-<div class="wrap">
-<header class="card">
-  <h1>PiSpider Hybrid</h1>
-  <p class="muted">SoloHost is the dashboard. Windows Worker does the Pi Node work on the Windows PC.</p>
-</header>
-
-<section id="terms" class="card">
-  <h2>Before you start</h2>
-  <p><b>PiSpider has 2 parts:</b></p>
-  <div class="step"><div class="num">1</div><div><b>SoloHost</b><br><span class="muted">The web dashboard: status, commands and results.</span></div></div>
-  <div class="step"><div class="num">2</div><div><b>Windows Worker</b><br><span class="muted">A PowerShell worker running on the Windows PC that has Pi Node / Docker.</span></div></div>
-  <div class="card">
-    <b>Simple terms</b>
-    <ul>
-      <li>The Worker can read Windows, Docker and Pi Node status.</li>
-      <li>The dashboard sends only predefined commands such as Scan, Status, Patrol and Repair.</li>
-      <li>No Pi wallet, passphrase or private key is requested.</li>
-      <li>SoloHost cannot directly start a Windows program from inside its container. You start the Worker on Windows.</li>
-    </ul>
-  </div>
-  <button class="primary" id="accept">I AGREE — CONTINUE</button>
-  <span id="acceptMsg" class="muted"></span>
-</section>
-
-<section id="setup" class="hidden">
-  <div class="card">
-    <h2>Step 2 — Start the Windows Worker</h2>
-    <p>Use <b>one</b> method below. The first method is easiest.</p>
-
-    <h3>Method A — double-click</h3>
-    <p>Double-click the Worker's launcher. It automatically finds the correct <b>WindowsWorker\LiveWorker.ps1</b> under your Pi Network apps folder.</p>
-    <pre class="code">WindowsWorker\Start-Worker.cmd</pre>
-
-    <h3>Method B — PowerShell (auto-find)</h3>
-    <p>Paste this into PowerShell. You do <b>not</b> need to know the username or app folder name:</p>
-    <pre class="code">$r=Join-Path $env:APPDATA 'Pi Network\pi-apps'; $w=Get-ChildItem $r -Filter LiveWorker.ps1 -Recurse -File | Where-Object { $_.FullName -match '\\WindowsWorker\\LiveWorker\.ps1$' } | Select-Object -First 1; if($w){powershell.exe -NoProfile -ExecutionPolicy Bypass -File $w.FullName}else{Write-Host 'WindowsWorker\LiveWorker.ps1 not found under Pi Network\pi-apps' -ForegroundColor Red}</pre>
-
-    <h3>Method C — CMD (auto-find)</h3>
-    <p>Paste this into CMD:</p>
-    <pre class="code">powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$r=Join-Path $env:APPDATA 'Pi Network\pi-apps'; $w=Get-ChildItem $r -Filter LiveWorker.ps1 -Recurse -File | Where-Object { $_.FullName -match '\\WindowsWorker\\LiveWorker\.ps1$' } | Select-Object -First 1; if($w){& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $w.FullName}else{Write-Host 'WindowsWorker\LiveWorker.ps1 not found'}"</pre>
-
-    <h3>Method D — download the Worker package</h3>
-    <p>If the Worker is missing, download the ZIP and extract its <b>contents into the WindowsWorker folder</b> of the PiSpider app:</p>
-    <pre class="code">%APPDATA%\Pi Network\pi-apps\&lt;PiSpider app folder&gt;\WindowsWorker\</pre>
-    <p>After extraction, this file must exist:</p>
-    <pre class="code">%APPDATA%\Pi Network\pi-apps\&lt;PiSpider app folder&gt;\WindowsWorker\LiveWorker.ps1</pre>
-    <p><a href="/windows-worker.zip"><button class="secondary" type="button">DOWNLOAD WINDOWS WORKER</button></a></p>
-    <p>Then double-click:</p>
-    <pre class="code">WindowsWorker\Activate_Worker.bat</pre>
-
-    <p class="warn"><b>Important:</b> Do not run two Worker windows at the same time. The Worker has a built-in single-instance lock and will refuse a second launch.</p>
-  </div>
-
-  <div class="card">
-    <h2>Step 3 — Check that it really works</h2>
-    <p>After starting the Worker, wait about 5–15 seconds and press:</p>
-    <button class="primary" id="check">CHECK WORKER</button>
-    <span id="checkMsg" class="muted"></span>
-    <div id="verify" class="status">Not checked yet.</div>
-    <pre id="verifyDetail"></pre>
-    <p class="muted">PASS means SoloHost has received a fresh Worker heartbeat. That is the actual installation check — not just a file being present.</p>
-  </div>
-
-  <div class="card">
-    <h3>If PASS does not appear</h3>
-    <ol>
-      <li>Make sure the PowerShell/Worker window is still open.</li>
-      <li>Run the command from the <b>same SoloHost app folder</b> that contains <code>WindowsWorker</code>.</li>
-      <li>Wait 15 seconds and check again.</li>
-      <li>If PowerShell blocks scripts, use the commands above with <code>-ExecutionPolicy Bypass</code>.</li>
-      <li>If you moved only the Worker folder to another location, put it back under the SoloHost app folder so the shared <code>Data\live</code> bus can be seen by SoloHost.</li>
-    </ol>
-  </div>
-</section>
-
+<body><div class="wrap">
+<header class="card"><h1>PiSpider Hybrid</h1><div class="muted">SoloHost control + Windows Worker execution. The dashboard mirrors the Worker operating view.</div></header>
+<section id="terms" class="card"><h2>Before you start</h2><p><b>PiSpider has 2 parts:</b></p><div class="step"><div class="num">1</div><div><b>SoloHost</b><br><span class="muted">Dashboard, commands, live status and results.</span></div></div><div class="step"><div class="num">2</div><div><b>Windows Worker</b><br><span class="muted">PowerShell worker that performs Pi Node / Docker work on Windows.</span></div></div><button class="primary" id="accept">I AGREE — CONTINUE</button><span id="acceptMsg" class="muted"></span></section>
+<section id="setup" class="hidden"><div class="card"><h2>Step 2 — Start Windows Worker</h2><p>Use one method. The launcher automatically finds <b>WindowsWorker\LiveWorker.ps1</b> under <code>%APPDATA%\Pi Network\pi-apps\</code>.</p><h3>PowerShell</h3><pre>$r=Join-Path $env:APPDATA 'Pi Network\pi-apps'; $w=Get-ChildItem $r -Filter LiveWorker.ps1 -Recurse -File | Where-Object { $_.FullName -match '\\WindowsWorker\\LiveWorker\.ps1$' } | Select-Object -First 1; if($w){powershell.exe -NoProfile -ExecutionPolicy Bypass -File $w.FullName}else{Write-Host 'WindowsWorker\\LiveWorker.ps1 not found' -ForegroundColor Red}</pre><h3>CMD</h3><pre>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$r=Join-Path $env:APPDATA 'Pi Network\pi-apps'; $w=Get-ChildItem $r -Filter LiveWorker.ps1 -Recurse -File | Where-Object { $_.FullName -match '\\WindowsWorker\\LiveWorker\.ps1$' } | Select-Object -First 1; if($w){& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $w.FullName}else{Write-Host 'Worker not found'}"</pre><h3>Download / extract</h3><p>Extract the ZIP contents into:</p><pre>%APPDATA%\Pi Network\pi-apps\&lt;PiSpider app folder&gt;\WindowsWorker\</pre><p>Required file:</p><pre>%APPDATA%\Pi Network\pi-apps\&lt;PiSpider app folder&gt;\WindowsWorker\LiveWorker.ps1</pre><p><a href="/windows-worker.zip"><button class="secondary">DOWNLOAD WINDOWS WORKER</button></a></p><p>Then double-click <b>Start-Worker.cmd</b>. The launcher requests Administrator and hides the command window.</p></div><div class="card"><h2>Step 3 — Verify</h2><button class="primary" id="check">CHECK WORKER</button> <span id="checkMsg" class="muted"></span><pre id="verifyDetail">Not checked yet.</pre></div></section>
 <section id="dashboard" class="hidden">
-  <div class="card">
-    <h2>PiSpider Dashboard</h2>
-    <div class="grid">
-      <div class="metric"><b>Worker</b><div id="workerState">—</div></div>
-      <div class="metric"><b>Activity</b><div id="activity">—</div></div>
-      <div class="metric"><b>Last action</b><div id="lastAction">—</div></div>
-      <div class="metric"><b>Last result</b><div id="lastResult">—</div></div>
-    </div>
-  </div>
-  <div class="card">
-    <h3>NOW / DONE / NEXT</h3>
-    <pre id="story">Loading…</pre>
-  </div>
-  <div class="card">
-    <h3>Automatic operation</h3>
-    <button class="primary" id="run">RUN — AUTONOMOUS</button>
-    <span class="muted">RUN starts the existing Worker schedule/rules and lets PiSpider operate automatically.</span>
-    <h3>Manual actions</h3>
-    <button class="secondary" data-action="SCAN">SCAN</button>
-    <button class="secondary" data-action="STATUS">STATUS</button>
-    <button class="secondary" data-action="PATROL">PATROL</button>
-    <button class="danger" data-action="REPAIR">REPAIR</button>
-    <p id="actionMsg" class="muted"></p>
-  </div>
-</section>
-</div>
-
+<div class="card"><div class="row"><div style="flex:1"><h2>PiSpider Worker Dashboard</h2><div id="connection" class="muted">Connecting…</div></div><button class="primary" id="run">RUN — AUTONOMOUS</button></div><div class="grid"><div class="metric"><b>Worker</b><div id="workerState">—</div></div><div class="metric"><b>Activity</b><div id="activity">—</div></div><div class="metric"><b>Current</b><div id="current">—</div></div><div class="metric"><b>Last Result</b><div id="lastResult">—</div></div></div></div>
+<div class="tabs"><button class="tab active" data-tab="live">Live</button><button class="tab" data-tab="commands">Commands</button><button class="tab" data-tab="settings">Settings</button></div>
+<div id="live" class="pane active"><div class="card"><h3>NOW / DONE / NEXT</h3><pre id="story">Loading…</pre><div class="bar"><i id="progress"></i></div></div><div class="card"><h3>Execution timeline</h3><div id="timeline" class="log"></div></div></div>
+<div id="commands" class="pane"><div class="card"><h3>Commands from SoloHost</h3><div class="row"><button class="secondary" data-action="SCAN">SCAN</button><button class="secondary" data-action="STATUS">STATUS</button><button class="secondary" data-action="PATROL">PATROL</button><button class="danger" data-action="REPAIR">REPAIR</button></div><p id="actionMsg" class="muted"></p><pre id="commandDetail">No command.</pre></div></div>
+<div id="settings" class="pane"><div class="card"><h3>Worker / connection</h3><p id="workerPath" class="muted">—</p><p id="busPath" class="muted">—</p><button class="secondary" id="refresh">Refresh now</button><button class="secondary" id="prepare">Prepare Worker package</button></div></div>
+</section></div>
 <script>
-async function api(path, options={}){
-  try{
-    const r=await fetch(path,{cache:'no-store',...options});
-    const j=await r.json();
-    return r.ok?j:null;
-  }catch(e){return null}
-}
-const $=id=>document.getElementById(id);
-
-function applyInstantStage(){
-  // Show the correct shell immediately from local state; server status hydrates in background.
-  const termsOk=localStorage.getItem('pispider_terms')==='1';
-  const verified=localStorage.getItem('pispider_worker_verified')==='1';
-  if(!termsOk){
-    $('terms').classList.remove('hidden');$('setup').classList.add('hidden');$('dashboard').classList.add('hidden');
-  }else if(verified){
-    $('terms').classList.add('hidden');$('setup').classList.add('hidden');$('dashboard').classList.remove('hidden');
-  }else{
-    $('terms').classList.add('hidden');$('setup').classList.remove('hidden');$('dashboard').classList.add('hidden');
-  }
-}
-async function refreshStage(){
-  const r=await api('/api/status');
-  if(!r)return;
-  if(!r.termsAccepted){
-    localStorage.removeItem('pispider_terms');localStorage.removeItem('pispider_worker_verified');
-    $('terms').classList.remove('hidden');$('setup').classList.add('hidden');$('dashboard').classList.add('hidden');return;
-  }
-  localStorage.setItem('pispider_terms','1');
-  if(r.workerAlive){
-    localStorage.setItem('pispider_worker_verified','1');
-    $('terms').classList.add('hidden');$('setup').classList.add('hidden');$('dashboard').classList.remove('hidden');
-    render(r);
-  }else{
-    localStorage.removeItem('pispider_worker_verified');
-    $('terms').classList.add('hidden');$('setup').classList.remove('hidden');$('dashboard').classList.add('hidden');
-  }
-}
-function showStage(){ applyInstantStage(); refreshStage(); }
+const $=id=>document.getElementById(id);let timer=null;let refreshBusy=false;
+async function api(path,opt={}){try{const r=await fetch(path,{cache:'no-store',...opt});return await r.json()}catch(e){return null}}
+function stage(){const t=localStorage.getItem('pispider_terms')==='1',v=localStorage.getItem('pispider_worker_verified')==='1';$('terms').classList.toggle('hidden',t);$('setup').classList.toggle('hidden',!t||v);$('dashboard').classList.toggle('hidden',!t||!v)}
+function esc(v){return String(v??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
 function render(r){
-  const hb=r.heartbeat||{}, res=r.lastResult||{}, cmd=r.lastCommand||{};
-  $('workerState').textContent=r.workerAlive?'ON':'OFF';
-  $('workerState').className=r.workerAlive?'ok':'bad';
-  $('activity').textContent=hb.Busy?'Working: '+(hb.Note||'action'):'Idle';
-  $('lastAction').textContent=res.Action||'—';
-  $('lastResult').textContent=res.Status?res.Status+' — '+(res.Summary||''):'No result yet';
-  $('story').textContent=[
-    '=== NOW ===',
-    r.workerAlive?'Worker ON — '+(hb.Note||'idle'):'Worker OFF',
-    'Heartbeat: '+(hb.At||'—'),
-    '',
-    '=== DONE ===',
-    res.Action?(res.Action+' | '+(res.Status||'')+' | '+(res.Summary||'')+' | '+(res.At||'')):'No completed action yet',
-    '',
-    '=== NEXT ===',
-    cmd.Action?('Queued: '+cmd.Action):'Ready — press SCAN or STATUS'
-  ].join('\\n');
+ const hb=r.heartbeat||{},p=r.progress||{},res=r.lastResult||{},cmd=r.lastCommand||{},last=r.lastCommandCompleted||{},auto=r.autonomous||{};
+ const alive=!!r.workerAlive,busy=!!r.workerBusy;
+ $('connection').textContent=alive?'CONNECTED • heartbeat '+(r.heartbeatAgeSec??0)+'s ago':'DISCONNECTED • heartbeat stale';$('connection').className=alive?'ok':'bad';
+ $('workerState').textContent=alive?'ONLINE':'OFFLINE';$('workerState').className=alive?'ok':'bad';
+ $('activity').textContent=busy?(hb.Note||p.Action||'WORKING'):(auto.Active?'AUTO • WAITING':'IDLE');
+ $('current').textContent=p.Action?(p.Action+' — '+p.Phase+' ('+(p.Percent??0)+'%)'):'Waiting for command';
+ $('lastResult').textContent=res.Status?(res.Status+' | '+res.Action+' | '+(res.Summary||'')):'—';
+ $('progress').style.width=Math.max(0,Math.min(100,Number(p.Percent||0)))+'%';
+ $('story').textContent=['=== NOW ===',busy?((p.Action||hb.Note||'WORKING')+' — '+(p.Phase||'RUNNING')):(auto.Active?'AUTO — waiting for next scheduled cycle':'Worker online — waiting'),'Heartbeat: '+(hb.At||'—'),'Connection age: '+(r.heartbeatAgeSec??'—')+'s','','=== DONE ===',res.Action?(res.Action+' | '+(res.Status||'')+' | '+(res.Summary||'')+' | '+(res.At||'')):'No completed action yet','','=== NEXT ===',cmd.Action?('Queued: '+cmd.Action):(auto.Active?'Continue autonomous schedule':'Ready')].join('\n');
+ $('commandDetail').textContent=['Command: '+(cmd.Action||last.Action||'—'),'ID: '+(cmd.Id||last.Id||'—'),'Progress: '+(p.Phase||'—')+' | '+(p.Detail||'—'),'Result: '+(res.Status||'—')+' | '+(res.Summary||'—'),'Worker PID: '+(hb.Pid||p.Pid||'—')].join('\n');
+ $('workerPath').textContent='Worker path: '+(r.workerPath||'—');$('busPath').textContent='Live bus: '+(r.busPath||'—');
+ const ev=(r.events||[]).slice().reverse();$('timeline').innerHTML=ev.map(e=>'<div class="logrow"><span>'+esc(e.At||e.ReceivedAt)+'</span><b>'+esc(e.Type||'EVENT')+'</b><span>'+esc(e.Action||e.Phase||e.Status||'')+'</span><span>'+esc(e.Detail||e.Summary||e.Note||'')+'</span></div>').join('')||'<div class="muted">No events yet.</div>';
 }
-$('run').onclick=async()=>{
-  const b=$('run'); b.disabled=true; $('actionMsg').textContent='Starting autonomous mode…';
-  const r=await api('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'RUN'})});
-  $('actionMsg').textContent=r&&r.ok?'RUN accepted — Worker is taking over automatically.':'Could not start RUN.';
-  b.disabled=false; setTimeout(showStage,700);
-};
-$('accept').onclick=async()=>{
-  $('accept').disabled=true;$('acceptMsg').textContent='Saving…';
-  const r=await api('/api/accept-terms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accepted:true})});
-  if(r&&r.ok){$('acceptMsg').textContent='Done. Continue below.';showStage();}
-  else{$('accept').disabled=false;$('acceptMsg').textContent='Could not save. Please try again.';}
-};
-$('check').onclick=async()=>{
-  $('check').disabled=true;
-  $('checkMsg').textContent='Checking…';
-  let r=null;
-  for(let i=0;i<4;i++){
-    r=await api('/api/worker-check');
-    if(r&&r.workerAlive) break;
-    if(i<3) await new Promise(x=>setTimeout(x,3000));
-  }
-  if(r&&r.workerAlive){
-    localStorage.setItem('pispider_worker_verified','1');
-    $('verify').textContent='✓ WORKER VERIFIED — opening dashboard…';$('verify').className='status ok';
-    $('verifyDetail').textContent='Heartbeat: '+(r.heartbeat.At||'—')+'\\nPID: '+(r.heartbeat.Pid||'—')+'\\nNote: '+(r.heartbeat.Note||'idle')+'\\nSource: '+(r.heartbeatSource||'HTTP/local bus');
-    $('checkMsg').textContent='Heartbeat received.';
-    setTimeout(showStage,500);
-  }else{
-    $('verify').textContent='Worker not detected yet.';$('verify').className='status warn';
-    $('verifyDetail').textContent=(r&&r.reason)||'No fresh heartbeat received. Keep the Worker window open and check again.';
-    $('checkMsg').textContent='No heartbeat yet.';
-  }
-  $('check').disabled=false;
-};
-document.querySelectorAll('[data-action]').forEach(b=>b.onclick=async()=>{
-  const a=b.dataset.action;b.disabled=true;$('actionMsg').textContent='Sending '+a+'…';
-  const r=await api('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a})});
-  $('actionMsg').textContent=r&&r.ok?'Queued '+a+'.':'Could not queue '+a+'.';
-  b.disabled=false;setTimeout(showStage,500);
-});
-applyInstantStage();refreshStage();setInterval(refreshStage,8000);
-</script>
-</body>
-</html>
+async function refresh(){if(refreshBusy)return;refreshBusy=true;const r=await api('/api/status');refreshBusy=false;if(!r)return;if(!r.termsAccepted){localStorage.removeItem('pispider_terms');localStorage.removeItem('pispider_worker_verified');stage();return}localStorage.setItem('pispider_terms','1');if(r.workerAlive){localStorage.setItem('pispider_worker_verified','1');stage();render(r)}else{localStorage.removeItem('pispider_worker_verified');stage();$('verifyDetail').textContent='Worker not connected. Keep the Worker running; the dashboard checks again automatically.'}}
+$('accept').onclick=async()=>{const b=$('accept');b.disabled=true;const r=await api('/api/accept-terms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accepted:true})});if(r?.ok){localStorage.setItem('pispider_terms','1');$('acceptMsg').textContent='Terms accepted.';stage()}else $('acceptMsg').textContent='Could not continue.';b.disabled=false};
+$('check').onclick=async()=>{const r=await api('/api/worker-check');if(r?.workerAlive){localStorage.setItem('pispider_worker_verified','1');$('verifyDetail').textContent='WORKER VERIFIED\nHeartbeat: '+(r.heartbeat.At||'—')+'\nPID: '+(r.heartbeat.Pid||'—');stage()}else $('verifyDetail').textContent='WAITING — no fresh heartbeat yet.'};
+$('run').onclick=()=>send('RUN');document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>send(b.dataset.action));async function send(a){const r=await api('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a})});$('actionMsg').textContent=r?.ok?(a+' queued — Worker will report progress here.'):'Command failed.';await refresh()}
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.pane').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active')});$('refresh').onclick=refresh;$('prepare').onclick=async()=>{const r=await api('/api/prepare-pack',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});$('actionMsg').textContent=r?.ok?'Worker package ready.':'Worker package preparation failed.'};stage();refresh();timer=setInterval(refresh,1000);
+</script></body></html>

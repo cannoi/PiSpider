@@ -12,11 +12,10 @@ services:
     ports:
       - "127.0.0.1:18770:18770"
     volumes:
-      - ./config.json:/app/config.json:ro
       - ./data:/data
       - ./:/solohost-config:rw
     environment:
-      PISPIDER_CONFIG: /app/config.json
+      PISPIDER_CONFIG: /solohost-config/config.json
       PISPIDER_DATA: /data
       SOLOHOST_CONFIG: /solohost-config
       TZ: Asia/Ho_Chi_Minh

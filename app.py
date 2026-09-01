@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import time
+import uuid
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -14,7 +15,13 @@ TZ = timezone(timedelta(hours=7))
 app = Flask(__name__)
 
 def cfg_path() -> Path:
-    return Path(os.environ.get("PISPIDER_CONFIG", "/app/config.json"))
+    p = Path(os.environ.get("PISPIDER_CONFIG", "/solohost-config/config.json"))
+    # Docker may have created config.json as a directory when a file bind mount was missing.
+    # Fall back to the immutable image copy instead of crashing or trying to read the directory.
+    if p.is_dir():
+        fallback = Path('/app/config.json')
+        return fallback if fallback.is_file() else p
+    return p
 
 
 def load_cfg() -> dict:
@@ -227,6 +234,29 @@ def write_json(path: Path, obj: dict) -> None:
 def now_iso() -> str:
     return datetime.now(TZ).isoformat()
 
+def append_worker_event(event: dict) -> None:
+    """Keep a small server-side live history so the SoloHost UI never depends on a mounted Windows path."""
+    p = data_root() / "live" / "worker_events.json"
+    try:
+        items = read_json(p) or []
+        if isinstance(items, dict):
+            items = [items]
+        items = list(items)[-199:]
+        items.append(event)
+        write_json(p, items)
+    except Exception:
+        pass
+
+def newest_live(name: str) -> dict:
+    best = {}
+    best_ts = ""
+    for d in all_bus_dirs():
+        item = read_json(d / name) or {}
+        ts = str(item.get("At") or item.get("RequestedAt") or item.get("UpdatedAt") or "")
+        if item and (not best or ts > best_ts):
+            best, best_ts = item, ts
+    return best
+
 
 def worker_alive(hb: dict | None) -> bool:
     if not hb:
@@ -238,7 +268,7 @@ def worker_alive(hb: dict | None) -> bool:
         t = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
         if t.tzinfo is None:
             t = t.replace(tzinfo=TZ)
-        return (datetime.now(TZ) - t.astimezone(TZ)).total_seconds() < 90
+        return (datetime.now(TZ) - t.astimezone(TZ)).total_seconds() < 8
     except Exception:
         return bool(hb.get("Alive"))
 
@@ -276,43 +306,36 @@ def home():
 
 @app.get("/api/status")
 def api_status():
-    hb = result = cmd = pending = {}
-    def newest_json(name):
-        best = {}
-        best_ts = ""
-        for d in all_bus_dirs():
-            item = read_json(d / name) or {}
-            ts = str(item.get("At") or item.get("RequestedAt") or item.get("UpdatedAt") or "")
-            if item and (not best or ts > best_ts):
-                best, best_ts = item, ts
-        return best
-    hb = newest_json("heartbeat.json")
-    result = newest_json("result.json")
-    cmd = newest_json("command.json")
-    pending = newest_json("pending_approval.json")
+    hb = newest_live("heartbeat.json")
+    result = newest_live("result.json")
+    cmd = newest_live("command.json")
+    last_cmd = newest_live("command.last.json")
+    pending = newest_live("pending_approval.json")
+    progress = newest_live("worker_progress.json")
+    state = newest_live("worker_state.json")
+    auto = newest_live("autonomous.json")
+    events = read_json(data_root() / "live" / "worker_events.json") or []
+    if isinstance(events, dict): events = [events]
     inst = read_json(data_root() / "install_state.json") or {}
     alive = worker_alive(hb)
     pack = inst.get("WorkerPack") or {}
-    return jsonify(
-        {
-            "ok": True,
-            "core": "PiSpider Hybrid Core",
-            "time": now_iso(),
-            "workerAlive": alive,
-            "workerBusy": bool(hb.get("Busy")),
-            "heartbeat": hb,
-            "lastResult": result,
-            "lastCommand": cmd,
-            "pending": pending,
-            "packInstalled": bool(pack.get("Ready")),
-            "packActivated": bool(pack.get("Activated")),
-            "pack": pack,
-            "workerPath": str(worker_dir()),
-            "busPath": str(bus_dir()),
-            "termsAccepted": bool((read_json(data_root() / "terms_accepted.json") or {}).get("Accepted")),
-            "activateHint": load_cfg().get("WindowsActivateHint"),
-        }
-    )
+    age = None
+    if hb.get("At"):
+        try:
+            t = datetime.fromisoformat(str(hb["At"]).replace("Z", "+00:00"))
+            age = max(0, round((datetime.now(TZ) - t.astimezone(TZ)).total_seconds(), 1))
+        except Exception: pass
+    return jsonify({
+        "ok": True, "core": "PiSpider Hybrid Core", "time": now_iso(),
+        "workerAlive": alive, "connection": "ONLINE" if alive else "OFFLINE",
+        "heartbeatAgeSec": age, "workerBusy": bool(hb.get("Busy")),
+        "heartbeat": hb, "lastResult": result, "lastCommand": cmd, "lastCommandCompleted": last_cmd,
+        "progress": progress, "workerState": state, "autonomous": auto, "pending": pending,
+        "events": list(events)[-80:], "packInstalled": bool(pack.get("Ready")),
+        "packActivated": bool(pack.get("Activated")), "pack": pack, "workerPath": str(worker_dir()),
+        "busPath": str(bus_dir()), "termsAccepted": bool((read_json(data_root() / "terms_accepted.json") or {}).get("Accepted")),
+        "activateHint": load_cfg().get("WindowsActivateHint"),
+    })
 
 
 @app.post("/api/command")
@@ -323,7 +346,7 @@ def api_command():
     if action not in allowed:
         return jsonify({"ok": False, "error": "unknown action"}), 400
     cmd = {
-        "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S"),
+        "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6],
         "Action": action,
         "RequestedAt": now_iso(),
         "TimeoutSec": 180,
@@ -342,7 +365,7 @@ def api_run():
     if script not in allowed:
         return jsonify({"ok": False, "error": "script not allowed"}), 400
     cmd = {
-        "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S"),
+        "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6],
         "Action": script.upper(),
         "Script": script,
         "RequestedAt": now_iso(),
@@ -362,7 +385,7 @@ def api_run_form():
     write_json(
         bus_dir() / "command.json",
         {
-            "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S"),
+            "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6],
             "Action": script.upper(),
             "Script": script,
             "RequestedAt": now_iso(),
@@ -416,6 +439,24 @@ def api_accept_terms():
             "message": "Terms accepted. Start the Windows Worker using one of the methods shown.",
         }
     )
+
+
+@app.post("/api/worker-event")
+def api_worker_event():
+    """Low-latency Worker telemetry transport. Windows posts heartbeat/progress/result/state here."""
+    body = request.get_json(silent=True) or {}
+    typ = str(body.get("Type") or "").upper()
+    allowed = {"HEARTBEAT", "PROGRESS", "RESULT", "STATE", "LOG"}
+    if typ not in allowed or body.get("Pack") not in (None, "windows-worker"):
+        return jsonify({"ok": False, "error": "invalid worker event"}), 400
+    event = dict(body)
+    event["Type"] = typ
+    event["ReceivedAt"] = now_iso()
+    live = data_root() / "live"
+    names = {"HEARTBEAT":"heartbeat.json", "PROGRESS":"worker_progress.json", "RESULT":"result.json", "STATE":"worker_state.json", "LOG":"worker_log.json"}
+    write_json(live / names[typ], event)
+    append_worker_event(event)
+    return jsonify({"ok": True, "type": typ, "receivedAt": event["ReceivedAt"]})
 
 
 @app.get("/api/worker-check")
@@ -478,7 +519,7 @@ def api_activate():
     write_json(
         bus_dir() / "command.json",
         {
-            "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S"),
+            "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6],
             "Action": "SCAN",
             "RequestedAt": now_iso(),
             "TimeoutSec": 180,
