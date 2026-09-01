@@ -51,3 +51,9 @@ If downloaded separately, extract the ZIP **contents into the target app's `Wind
 `LiveWorker.ps1` has a global single-instance mutex, so a second launch exits safely instead of creating a competing command consumer.
 
 When the packaged canonical SoloHost compose differs from the app's `docker-compose.yml`, the Worker creates a timestamped backup, replaces the compose file with the canonical communication configuration, writes a restart request into `Data\live`, and attempts `docker compose stop pispider-core` followed by `docker compose up -d --force-recreate pispider-core`. It does not restart anything when the compose is already synchronized.
+
+## Performance and protected config files
+
+The dashboard renders its shell immediately and hydrates status in the background. After the first verified session, the dashboard shell can appear without waiting for the full status payload; the server remains authoritative and will return to Worker setup if verification is lost.
+
+The Windows Worker does not read the protected Pi Desktop `config.json` just to discover the SoloHost port. It uses the known localhost ports 18770/18780 (or `PISPIDER_SOLOHOST_PORT`) to avoid `GetContentReaderUnauthorizedAccessError`.

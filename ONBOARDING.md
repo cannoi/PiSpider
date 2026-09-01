@@ -71,3 +71,8 @@ For a downloaded package, extract the ZIP contents into the target app's `Window
 The Worker has a single-instance mutex. Starting it again does not create a second command consumer.
 
 When the canonical SoloHost compose file differs, the Worker creates a timestamped `.pispider-backup-*` backup, synchronizes `docker-compose.yml`, writes a `Data\live\solohost_restart_request.json` event, then attempts `docker compose stop pispider-core` followed by `docker compose up -d --force-recreate pispider-core`. If Docker is unavailable, the synchronized compose remains in place and the user can start SoloHost normally.
+
+## If PowerShell says `GetContentReaderUnauthorizedAccessError`
+
+If the Worker prints `Access to ...\config.json is denied`, do not change Windows permissions.
+Current Worker versions do not need to read that protected file. Replace the Worker package with the current package and start it again. The Worker uses the SoloHost localhost ports (18770, 18780) and can also use `PISPIDER_SOLOHOST_PORT` when explicitly configured.

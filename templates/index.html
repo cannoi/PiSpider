@@ -15,7 +15,7 @@ button{border:0;border-radius:9px;padding:12px 16px;font-size:15px;font-weight:6
 pre{white-space:pre-wrap;overflow:auto;background:#f7f8fa;border-radius:9px;padding:12px;font-size:13px;line-height:1.5}
 .code{user-select:all}.step{display:flex;gap:12px;margin:12px 0}.num{min-width:30px;height:30px;border-radius:50%;background:#e8f2ee;display:grid;place-items:center;font-weight:700}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.metric{padding:14px;background:#f7f8fa;border-radius:10px}
-.hidden{display:none}.status{font-weight:700}
+.hidden{display:none}.status{font-weight:700}.skeleton{opacity:.7}.instant{content-visibility:auto}
 @media(max-width:650px){.grid{grid-template-columns:1fr}.wrap{padding:12px}}
 </style>
 </head>
@@ -130,15 +130,36 @@ async function api(path, options={}){
 }
 const $=id=>document.getElementById(id);
 
-function showStage(){
-  api('/api/status').then(r=>{
-    if(!r)return;
-    if(!r.termsAccepted){$('terms').classList.remove('hidden');$('setup').classList.add('hidden');$('dashboard').classList.add('hidden');return;}
-    if(!r.workerAlive){$('terms').classList.add('hidden');$('setup').classList.remove('hidden');$('dashboard').classList.add('hidden');return;}
+function applyInstantStage(){
+  // Show the correct shell immediately from local state; server status hydrates in background.
+  const termsOk=localStorage.getItem('pispider_terms')==='1';
+  const verified=localStorage.getItem('pispider_worker_verified')==='1';
+  if(!termsOk){
+    $('terms').classList.remove('hidden');$('setup').classList.add('hidden');$('dashboard').classList.add('hidden');
+  }else if(verified){
+    $('terms').classList.add('hidden');$('setup').classList.add('hidden');$('dashboard').classList.remove('hidden');
+  }else{
+    $('terms').classList.add('hidden');$('setup').classList.remove('hidden');$('dashboard').classList.add('hidden');
+  }
+}
+async function refreshStage(){
+  const r=await api('/api/status');
+  if(!r)return;
+  if(!r.termsAccepted){
+    localStorage.removeItem('pispider_terms');localStorage.removeItem('pispider_worker_verified');
+    $('terms').classList.remove('hidden');$('setup').classList.add('hidden');$('dashboard').classList.add('hidden');return;
+  }
+  localStorage.setItem('pispider_terms','1');
+  if(r.workerAlive){
+    localStorage.setItem('pispider_worker_verified','1');
     $('terms').classList.add('hidden');$('setup').classList.add('hidden');$('dashboard').classList.remove('hidden');
     render(r);
-  });
+  }else{
+    localStorage.removeItem('pispider_worker_verified');
+    $('terms').classList.add('hidden');$('setup').classList.remove('hidden');$('dashboard').classList.add('hidden');
+  }
 }
+function showStage(){ applyInstantStage(); refreshStage(); }
 function render(r){
   const hb=r.heartbeat||{}, res=r.lastResult||{}, cmd=r.lastCommand||{};
   $('workerState').textContent=r.workerAlive?'ON':'OFF';
@@ -174,6 +195,7 @@ $('check').onclick=async()=>{
     if(i<3) await new Promise(x=>setTimeout(x,3000));
   }
   if(r&&r.workerAlive){
+    localStorage.setItem('pispider_worker_verified','1');
     $('verify').textContent='✓ WORKER VERIFIED — opening dashboard…';$('verify').className='status ok';
     $('verifyDetail').textContent='Heartbeat: '+(r.heartbeat.At||'—')+'\\nPID: '+(r.heartbeat.Pid||'—')+'\\nNote: '+(r.heartbeat.Note||'idle')+'\\nSource: '+(r.heartbeatSource||'HTTP/local bus');
     $('checkMsg').textContent='Heartbeat received.';
@@ -191,7 +213,7 @@ document.querySelectorAll('[data-action]').forEach(b=>b.onclick=async()=>{
   $('actionMsg').textContent=r&&r.ok?'Queued '+a+'.':'Could not queue '+a+'.';
   b.disabled=false;setTimeout(showStage,500);
 });
-showStage();setInterval(showStage,5000);
+applyInstantStage();refreshStage();setInterval(refreshStage,8000);
 </script>
 </body>
 </html>

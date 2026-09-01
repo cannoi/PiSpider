@@ -87,16 +87,12 @@ Write-Host "[WORKER] Poll=${PollSeconds}s   Activate by Core command.json"
 function Get-CoreHeartbeatUrls {
     $ports = New-Object System.Collections.Generic.List[int]
     # Prefer the SoloHost port declared by the app config, then known legacy/current ports.
-    foreach ($file in @((Join-Path (Split-Path -Parent $script:SpiderRoot) 'config.json'), (Join-Path $script:SpiderRoot 'config.json'))) {
-        if (Test-Path -LiteralPath $file) {
-            try {
-                $cfg = Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json
-                $port = 0
-                try { $port = [int]$cfg.Port } catch {}
-                if ($port -gt 0 -and -not $ports.Contains($port)) { [void]$ports.Add($port) }
-            } catch {}
-        }
-    }
+    # Do NOT read the Pi app's config.json here. Pi Desktop may protect that file
+    # with ACLs even when the Worker itself is runnable. The known SoloHost
+    # localhost ports are enough and avoid noisy AccessDenied errors.
+    $envPort = 0
+    try { $envPort = [int]$env:PISPIDER_SOLOHOST_PORT } catch {}
+    if ($envPort -gt 0 -and -not $ports.Contains($envPort)) { [void]$ports.Add($envPort) }
     foreach ($port in @(18770,18780)) {
         if (-not $ports.Contains($port)) { [void]$ports.Add($port) }
     }
