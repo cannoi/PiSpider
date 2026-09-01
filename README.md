@@ -41,3 +41,13 @@ docker build -t pispider-hybrid-core:1.0.0 .
 docker compose up -d
 # http://SOLOHOST_IP:18770
 ```
+
+## Windows Worker discovery and SoloHost channel
+
+The Windows launcher automatically searches `%APPDATA%\Pi Network\pi-apps\` for `WindowsWorker\LiveWorker.ps1`; users do not need to type their Windows username or application folder name.
+
+If downloaded separately, extract the ZIP **contents into the target app's `WindowsWorker\` folder**. The required final file is `%APPDATA%\Pi Network\pi-apps\<PiSpider app folder>\WindowsWorker\LiveWorker.ps1`.
+
+`LiveWorker.ps1` has a global single-instance mutex, so a second launch exits safely instead of creating a competing command consumer.
+
+When the packaged canonical SoloHost compose differs from the app's `docker-compose.yml`, the Worker creates a timestamped backup, replaces the compose file with the canonical communication configuration, writes a restart request into `Data\live`, and attempts `docker compose stop pispider-core` followed by `docker compose up -d --force-recreate pispider-core`. It does not restart anything when the compose is already synchronized.

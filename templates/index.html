@@ -50,23 +50,27 @@ pre{white-space:pre-wrap;overflow:auto;background:#f7f8fa;border-radius:9px;padd
     <p>Use <b>one</b> method below. The first method is easiest.</p>
 
     <h3>Method A — double-click</h3>
-    <p>Open the PiSpider SoloHost app folder on Windows and double-click:</p>
-    <pre class="code">Start-Worker.cmd</pre>
+    <p>Double-click the Worker's launcher. It automatically finds the correct <b>WindowsWorker\LiveWorker.ps1</b> under your Pi Network apps folder.</p>
+    <pre class="code">WindowsWorker\Start-Worker.cmd</pre>
 
-    <h3>Method B — PowerShell</h3>
-    <p>Open PowerShell <b>in the PiSpider app folder</b>:</p>
-    <pre class="code">powershell -NoProfile -ExecutionPolicy Bypass -File ".\WindowsWorker\LiveWorker.ps1"</pre>
+    <h3>Method B — PowerShell (auto-find)</h3>
+    <p>Paste this into PowerShell. You do <b>not</b> need to know the username or app folder name:</p>
+    <pre class="code">$r=Join-Path $env:APPDATA 'Pi Network\pi-apps'; $w=Get-ChildItem $r -Filter LiveWorker.ps1 -Recurse -File | Where-Object { $_.FullName -match '\\WindowsWorker\\LiveWorker\.ps1$' } | Select-Object -First 1; if($w){powershell.exe -NoProfile -ExecutionPolicy Bypass -File $w.FullName}else{Write-Host 'WindowsWorker\LiveWorker.ps1 not found under Pi Network\pi-apps' -ForegroundColor Red}</pre>
 
-    <h3>Method C — CMD</h3>
-    <p>Open CMD <b>in the PiSpider app folder</b>:</p>
-    <pre class="code">powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\WindowsWorker\LiveWorker.ps1"</pre>
+    <h3>Method C — CMD (auto-find)</h3>
+    <p>Paste this into CMD:</p>
+    <pre class="code">powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$r=Join-Path $env:APPDATA 'Pi Network\pi-apps'; $w=Get-ChildItem $r -Filter LiveWorker.ps1 -Recurse -File | Where-Object { $_.FullName -match '\\WindowsWorker\\LiveWorker\.ps1$' } | Select-Object -First 1; if($w){& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $w.FullName}else{Write-Host 'WindowsWorker\LiveWorker.ps1 not found'}"</pre>
 
     <h3>Method D — download the Worker package</h3>
-    <p>If the Worker files are missing on Windows, download the package, extract it into the SoloHost app folder, then run:</p>
+    <p>If the Worker is missing, download the ZIP and extract its <b>contents into the WindowsWorker folder</b> of the PiSpider app:</p>
+    <pre class="code">%APPDATA%\Pi Network\pi-apps\&lt;PiSpider app folder&gt;\WindowsWorker\</pre>
+    <p>After extraction, this file must exist:</p>
+    <pre class="code">%APPDATA%\Pi Network\pi-apps\&lt;PiSpider app folder&gt;\WindowsWorker\LiveWorker.ps1</pre>
     <p><a href="/windows-worker.zip"><button class="secondary" type="button">DOWNLOAD WINDOWS WORKER</button></a></p>
-    <pre class="code">.\WindowsWorker\Activate_Worker.bat</pre>
+    <p>Then double-click:</p>
+    <pre class="code">WindowsWorker\Activate_Worker.bat</pre>
 
-    <p class="warn"><b>Important:</b> Do not run two Worker windows at the same time. Keep one Worker window open while testing.</p>
+    <p class="warn"><b>Important:</b> Do not run two Worker windows at the same time. The Worker has a built-in single-instance lock and will refuse a second launch.</p>
   </div>
 
   <div class="card">

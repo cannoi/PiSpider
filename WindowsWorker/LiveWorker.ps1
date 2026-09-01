@@ -12,6 +12,67 @@ $script:SpiderRoot = $PSScriptRoot
 if (-not $script:SpiderRoot) { $script:SpiderRoot = Split-Path -Parent $MyInvocation.MyCommand.Path }
 $env:PINODE_SPIDER_ROOT = $script:SpiderRoot
 
+# Single-instance guard: every launcher and direct PowerShell invocation share the same mutex.
+$script:WorkerMutex = New-Object System.Threading.Mutex($false, 'Global\PiSpider-WindowsWorker')
+if (-not $script:WorkerMutex.WaitOne(0, $false)) {
+    Write-Host '[WORKER] Already running. This window will not start a second Worker.' -ForegroundColor Yellow
+    exit 0
+}
+
+function Write-AtomicText {
+    param([string]$Path, [string]$Text)
+    $tmp = "$Path.pispider.tmp"
+    [IO.File]::WriteAllText($tmp, $Text, (New-Object Text.UTF8Encoding($false)))
+    Move-Item -LiteralPath $tmp -Destination $Path -Force
+}
+
+function Sync-SoloHostCompose {
+    param([string]$Root)
+    $compose = Join-Path (Split-Path -Parent $Root) 'docker-compose.yml'
+    if (-not (Test-Path -LiteralPath $compose)) { return $false }
+    $canonical = Get-Content -LiteralPath $compose -Raw -Encoding UTF8
+    # This package's compose is the canonical SoloHost channel definition.
+    # A separate immutable copy is embedded beside the Worker by the launcher.
+    $canonicalFile = Join-Path $Root 'Engine\SoloHost.docker-compose.yml'
+    if (-not (Test-Path -LiteralPath $canonicalFile)) { return $false }
+    $desired = Get-Content -LiteralPath $canonicalFile -Raw -Encoding UTF8
+    if (($canonical -replace "`r`n", "`n") -eq ($desired -replace "`r`n", "`n")) { return $false }
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    Copy-Item -LiteralPath $compose -Destination "$compose.pispider-backup-$stamp" -Force
+    Write-AtomicText -Path $compose -Text $desired
+    return $true
+}
+
+function Restart-SoloHostApp {
+    param([string]$Root)
+    $appRoot = Split-Path -Parent $Root
+    $docker = Get-Command docker.exe -ErrorAction SilentlyContinue
+    if (-not $docker) { throw 'Docker CLI not found.' }
+    $request = Join-Path $Root 'Data\live\solohost_restart_request.json'
+    $req = [ordered]@{ Action='STOP_START'; Service='pispider-core'; RequestedAt=(Get-Date).ToString('o'); Source='windows-worker' }
+    $json = $req | ConvertTo-Json -Depth 4
+    try { Write-AtomicText -Path $request -Text $json } catch {}
+    Push-Location $appRoot
+    try {
+        Write-Host '[WORKER] SoloHost: STOP pispider-core' -ForegroundColor Cyan
+        & $docker.Source compose stop pispider-core
+        if ($LASTEXITCODE -ne 0) { throw "docker compose stop failed ($LASTEXITCODE)" }
+        Write-Host '[WORKER] SoloHost: START pispider-core with updated compose' -ForegroundColor Cyan
+        & $docker.Source compose up -d --force-recreate pispider-core
+        if ($LASTEXITCODE -ne 0) { throw "docker compose up failed ($LASTEXITCODE)" }
+    } finally { Pop-Location }
+}
+
+# Synchronize only when the existing compose differs. Never overwrite on every start.
+try {
+    $composeChanged = Sync-SoloHostCompose -Root $script:SpiderRoot
+    if ($composeChanged) {
+        Write-Host '[WORKER] SoloHost docker-compose.yml updated; applying STOP -> START.' -ForegroundColor Yellow
+        try { Restart-SoloHostApp -Root $script:SpiderRoot }
+        catch { Write-Warning "SoloHost restart failed: $($_.Exception.Message). The compose backup and new compose remain in place." }
+    }
+} catch { Write-Warning "SoloHost compose sync skipped: $($_.Exception.Message)" }
+
 $bus = Join-Path $script:SpiderRoot 'Engine\LiveBus.ps1'
 if (-not (Test-Path -LiteralPath $bus)) { throw "Missing Engine\LiveBus.ps1" }
 . $bus

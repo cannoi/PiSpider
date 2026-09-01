@@ -1,0 +1,26 @@
+# PiSpider Hybrid — SoloHost
+# pi.ui.primary = Dashboard inside SoloHost
+# One WindowsWorker at app root. Bus = WindowsWorker/Data/live
+
+services:
+  pispider-core:
+    image: ghcr.io/cannoi/pispider:latest
+    container_name: pispider-core
+    labels:
+      pi.ui.primary: "true"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18770:18770"
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./data:/data
+      - ./:/solohost-config:rw
+    environment:
+      PISPIDER_CONFIG: /app/config.json
+      PISPIDER_DATA: /data
+      SOLOHOST_CONFIG: /solohost-config
+      TZ: Asia/Ho_Chi_Minh
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 128m
+    cpus: "0.25"

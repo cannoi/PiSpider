@@ -54,3 +54,20 @@ If verification fails:
 SoloHost runs in a container and cannot directly launch a Windows PowerShell process. The browser therefore does **not** pretend that a Worker was started. The user starts it on Windows, and SoloHost verifies it through the shared live bus.
 
 The dashboard does not expose arbitrary command execution. Commands sent to the Worker remain whitelisted.
+
+
+## Automatic Windows path discovery
+
+The Worker launcher searches under:
+
+`%APPDATA%\Pi Network\pi-apps\`
+
+and selects a `WindowsWorker\LiveWorker.ps1` installation. The user does not need to type the Windows username or Pi app folder name.
+
+For a downloaded package, extract the ZIP contents into the target app's `WindowsWorker\` directory. The required final path is:
+
+`%APPDATA%\Pi Network\pi-apps\<PiSpider app folder>\WindowsWorker\LiveWorker.ps1`
+
+The Worker has a single-instance mutex. Starting it again does not create a second command consumer.
+
+When the canonical SoloHost compose file differs, the Worker creates a timestamped `.pispider-backup-*` backup, synchronizes `docker-compose.yml`, writes a `Data\live\solohost_restart_request.json` event, then attempts `docker compose stop pispider-core` followed by `docker compose up -d --force-recreate pispider-core`. If Docker is unavailable, the synchronized compose remains in place and the user can start SoloHost normally.

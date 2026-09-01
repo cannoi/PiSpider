@@ -1,24 +1,20 @@
 @echo off
 setlocal
-set "HERE=%~dp0"
-set "W=%HERE%WindowsWorker"
-if not exist "%W%\LiveWorker.ps1" set "W=%HERE%"
-if not exist "%W%\LiveWorker.ps1" (
-  echo LiveWorker.ps1 not found. Run this from the PiSpider SoloHost app folder.
+chcp 65001 >nul
+set "BOOT=%~dp0Bootstrap-Worker.ps1"
+if not exist "%BOOT%" (
+  echo PiSpider Worker bootstrap not found.
   pause
   exit /b 1
 )
-cd /d "%W%"
 echo.
 echo ============================================================
-echo PiSpider Windows Worker
-echo ============================================================
-echo Root: %W%
+echo PiSpider Windows Worker - automatic discovery
+ echo ============================================================
+echo It will find WindowsWorker\LiveWorker.ps1 under:
+echo %%APPDATA%%\Pi Network\pi-apps\
 echo.
-echo Starting LiveWorker only (single command consumer)...
-echo Keep this window open while testing.
-echo.
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%W%\LiveWorker.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%BOOT%"
 echo.
 echo Worker stopped. ExitCode=%ERRORLEVEL%
 pause
