@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request, redirect, send_file
+from flask import Flask, jsonify, render_template, request, redirect, send_file, Response
 
 TZ = timezone(timedelta(hours=7))
 app = Flask(__name__)
@@ -458,6 +458,45 @@ def api_worker_event():
     append_worker_event(event)
     return jsonify({"ok": True, "type": typ, "receivedAt": event["ReceivedAt"]})
 
+
+@app.get("/api/stream")
+def api_stream():
+    """Low-latency dashboard stream. Never changes onboarding state; only publishes live worker telemetry."""
+    import json as _json
+    import time as _time
+    def generate():
+        last_sig = None
+        while True:
+            hb = newest_live("heartbeat.json")
+            progress = newest_live("worker_progress.json")
+            result = newest_live("result.json")
+            state = newest_live("worker_state.json")
+            auto = newest_live("autonomous.json")
+            events = read_json(data_root() / "live" / "worker_events.json") or []
+            if isinstance(events, dict): events = [events]
+            payload = {
+                "ok": True, "time": now_iso(),
+                "workerAlive": worker_alive(hb),
+                "heartbeatAgeSec": None,
+                "workerBusy": bool(hb.get("Busy")),
+                "heartbeat": hb, "progress": progress, "lastResult": result,
+                "workerState": state, "autonomous": auto, "events": list(events)[-80:],
+            }
+            if hb.get("At"):
+                try:
+                    t=datetime.fromisoformat(str(hb["At"]).replace("Z","+00:00"))
+                    if t.tzinfo is None: t=t.replace(tzinfo=TZ)
+                    payload["heartbeatAgeSec"]=max(0, round((datetime.now(TZ)-t.astimezone(TZ)).total_seconds(),1))
+                except Exception: pass
+            text=_json.dumps(payload,ensure_ascii=False,separators=(",",":"))
+            sig=(payload["heartbeat"].get("At"), payload["progress"].get("At"), payload["lastResult"].get("At"), len(payload["events"]))
+            if sig != last_sig:
+                last_sig=sig
+                yield f"data: {text}\n\n"
+            else:
+                yield ": keepalive\n\n"
+            _time.sleep(0.75)
+    return Response(generate(), mimetype="text/event-stream", headers={"Cache-Control":"no-cache, no-store, must-revalidate", "X-Accel-Buffering":"no", "Connection":"keep-alive"})
 
 @app.get("/api/worker-check")
 def api_worker_check():

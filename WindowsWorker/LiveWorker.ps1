@@ -166,6 +166,7 @@ function Write-WorkerProgress {
     $at=(Get-Date).ToString('o'); $obj=[ordered]@{Action=$Action;Phase=$Phase;Detail=$Detail;Percent=$Percent;At=$at;Pid=$PID}
     try { Write-SpiderLiveJson -Name 'worker_progress.json' -Object $obj } catch {}
     try { Send-CoreEvent -Type 'PROGRESS' -Payload @{Action=$Action;Phase=$Phase;Detail=$Detail;Percent=$Percent;At=$at;Pid=$PID} } catch {}
+    try { Send-CoreEvent -Type 'LOG' -Payload @{Action=$Action;Level='INFO';Message=("$Phase | $Detail | $Percent%");At=$at;Pid=$PID} } catch {}
 }
 function Write-WorkerState {
     param([bool]$Active=$true,[string]$Mode='AUTO',[string]$Note='')
@@ -238,6 +239,7 @@ function Invoke-LiveAction {
     Write-WorkerState -Active $true -Mode 'AUTO' -Note 'idle'
 }
 
+try { Send-CoreEvent -Type 'LOG' -Payload @{Action='WORKER';Level='INFO';Message='Windows Worker online; AUTO polling started';At=(Get-Date).ToString('o');Pid=$PID} } catch {}
 Write-WorkerHeartbeat -Busy $false -Note 'waiting'
 Write-WorkerState -Active $true -Mode 'AUTO' -Note 'waiting'
 $lastId = ''
