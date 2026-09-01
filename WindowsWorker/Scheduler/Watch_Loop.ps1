@@ -11,6 +11,21 @@ param(
 )
 
 $ErrorActionPreference = 'SilentlyContinue'
+
+# One autonomous loop only. RUN from Dashboard must not create duplicates.
+$mutex = New-Object System.Threading.Mutex($false, 'Global\PiSpider-AutonomousRun')
+if (-not $mutex.WaitOne(0,$false)) { Write-Host '[SPIDER] Autonomous RUN already active.'; exit 0 }
+
+# RUN must be elevated because downstream Docker/Windows recovery actions may require Administrator.
+try {
+    $id=[Security.Principal.WindowsIdentity]::GetCurrent(); $pr=New-Object Security.Principal.WindowsPrincipal($id)
+    if (-not $pr.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        $arg='-NoProfile -ExecutionPolicy Bypass -File +$MyInvocation.MyCommand.Path+ -IncludePatrolAtConfigHour'
+        if($IntervalMinutes -gt 0){$arg+=' -IntervalMinutes '+$IntervalMinutes}
+        Start-Process powershell.exe -Verb RunAs -ArgumentList $arg | Out-Null
+        exit 0
+    }
+} catch {}
 $SpiderRoot = Split-Path -Parent $PSScriptRoot
 $Main = Join-Path $SpiderRoot 'PiNodeSpider.ps1'
 $ConfigPath = Join-Path $SpiderRoot 'Config.json'

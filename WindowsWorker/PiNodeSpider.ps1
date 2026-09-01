@@ -6,7 +6,7 @@
 # ============================================================
 [CmdletBinding()]
 param(
-    [ValidateSet('Scan','Diagnose','Status','Repair','Patrol','History','Recovery','Emergency','SetMode','Map','Watch','Menu','DailyReport','LiveWorker')]
+    [ValidateSet('Run','Scan','Diagnose','Status','Repair','Patrol','History','Recovery','Emergency','SetMode','Map','Watch','Menu','DailyReport','LiveWorker')]
     [string]$Command = 'Scan',
 
     [ValidateSet('soft','network','docker','wsl','node','hard','all','reboot')]
@@ -104,6 +104,21 @@ function Show-HealthReport {
         Write-Host ("   AutoExecute : {0} | NeedsApproval: {1}" -f $Decision.AutoExecute, $Decision.RequiresApproval)
         Write-Host ""
     }
+}
+
+
+function Invoke-SpiderRun {
+    # RUN is the single dashboard entry point for autonomous operation.
+    # It reuses the existing scheduler/rules; it does not invent new repair rules.
+    $loop = Join-Path $script:SpiderRoot 'Scheduler\Watch_Loop.ps1'
+    if (-not (Test-Path -LiteralPath $loop)) { throw "Autonomous scheduler missing: $loop" }
+    try {
+        $existing = Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe' OR Name = 'pwsh.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine -match 'Scheduler[\\/]Watch_Loop\.ps1' } | Select-Object -First 1
+        if ($existing) { return [pscustomobject]@{ Started=$false; AlreadyRunning=$true; Pid=[int]$existing.ProcessId } }
+        $arg = '-NoProfile -ExecutionPolicy Bypass -File "'+$loop+'" -IncludePatrolAtConfigHour'
+        $p = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -ArgumentList $arg -WorkingDirectory $script:SpiderRoot -WindowStyle Hidden -PassThru
+        return [pscustomobject]@{ Started=$true; AlreadyRunning=$false; Pid=[int]$p.Id }
+    } catch { throw }
 }
 
 function Invoke-SpiderScan {
@@ -479,6 +494,7 @@ function Clear-SpiderPendingApproval {
 }
 
 switch ($Command) {
+    'Run'        { Invoke-SpiderRun }
     'Scan'       { Invoke-SpiderScan | Out-Null }
     'Diagnose'   { Invoke-SpiderScan | Out-Null }
     'Status'     { Show-Status }

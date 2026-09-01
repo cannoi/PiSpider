@@ -110,8 +110,11 @@ pre{white-space:pre-wrap;overflow:auto;background:#f7f8fa;border-radius:9px;padd
     <pre id="story">Loading…</pre>
   </div>
   <div class="card">
-    <h3>Actions</h3>
-    <button class="primary" data-action="SCAN">SCAN</button>
+    <h3>Automatic operation</h3>
+    <button class="primary" id="run">RUN — AUTONOMOUS</button>
+    <span class="muted">RUN starts the existing Worker schedule/rules and lets PiSpider operate automatically.</span>
+    <h3>Manual actions</h3>
+    <button class="secondary" data-action="SCAN">SCAN</button>
     <button class="secondary" data-action="STATUS">STATUS</button>
     <button class="secondary" data-action="PATROL">PATROL</button>
     <button class="danger" data-action="REPAIR">REPAIR</button>
@@ -179,6 +182,12 @@ function render(r){
     cmd.Action?('Queued: '+cmd.Action):'Ready — press SCAN or STATUS'
   ].join('\\n');
 }
+$('run').onclick=async()=>{
+  const b=$('run'); b.disabled=true; $('actionMsg').textContent='Starting autonomous mode…';
+  const r=await api('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'RUN'})});
+  $('actionMsg').textContent=r&&r.ok?'RUN accepted — Worker is taking over automatically.':'Could not start RUN.';
+  b.disabled=false; setTimeout(showStage,700);
+};
 $('accept').onclick=async()=>{
   $('accept').disabled=true;$('acceptMsg').textContent='Saving…';
   const r=await api('/api/accept-terms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accepted:true})});

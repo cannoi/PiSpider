@@ -12,6 +12,20 @@ $script:SpiderRoot = $PSScriptRoot
 if (-not $script:SpiderRoot) { $script:SpiderRoot = Split-Path -Parent $MyInvocation.MyCommand.Path }
 $env:PINODE_SPIDER_ROOT = $script:SpiderRoot
 
+# Pi Node recovery may require Administrator rights. Elevate once at the launcher boundary.
+try {
+    $id=[Security.Principal.WindowsIdentity]::GetCurrent()
+    $pr=New-Object Security.Principal.WindowsPrincipal($id)
+    if (-not $pr.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        $args='-NoProfile -ExecutionPolicy Bypass -File +$MyInvocation.MyCommand.Path+'
+        if($PollSeconds){$args+=' -PollSeconds '+$PollSeconds}
+        if($Once){$args+=' -Once'}
+        Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -Verb RunAs -ArgumentList $args | Out-Null
+        Write-Host '[WORKER] Administrator permission requested. The elevated Worker will continue.' -ForegroundColor Yellow
+        exit 0
+    }
+} catch { Write-Warning "Administrator elevation check failed: $($_.Exception.Message)" }
+
 # Single-instance guard: every launcher and direct PowerShell invocation share the same mutex.
 $script:WorkerMutex = New-Object System.Threading.Mutex($false, 'Global\PiSpider-WindowsWorker')
 if (-not $script:WorkerMutex.WaitOne(0, $false)) {
@@ -132,7 +146,8 @@ function Write-WorkerHeartbeat {
 function Invoke-LiveAction {
     param([string]$Action)
     $map = @{
-        SCAN    = 'Scan'
+        RUN     = 'Run'
+    SCAN    = 'Scan'
         PATROL  = 'Patrol'
         STATUS  = 'Status'
         REPAIR  = 'Repair'
@@ -146,14 +161,32 @@ function Invoke-LiveAction {
     }
     Write-WorkerHeartbeat -Busy $true -Note $cmd
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    $p = Start-Process -FilePath $ps -ArgumentList @(
-        '-NoProfile','-ExecutionPolicy','Bypass','-File', $main, '-Command', $cmd, '-Quiet'
-    ) -WorkingDirectory $script:SpiderRoot -Wait -PassThru -WindowStyle Hidden
-    $code = 0
-    try { $code = [int]$p.ExitCode } catch {}
+    $stdout = Join-Path $script:SpiderRoot 'Data\live\worker.stdout.log'
+    $stderr = Join-Path $script:SpiderRoot 'Data\live\worker.stderr.log'
+    Remove-Item -LiteralPath $stdout,$stderr -Force -ErrorAction SilentlyContinue
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $ps
+    $psi.Arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $main + '" -Command ' + $cmd + ' -Quiet'
+    $psi.WorkingDirectory = $script:SpiderRoot
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $proc = New-Object System.Diagnostics.Process
+    $proc.StartInfo = $psi
+    [void]$proc.Start()
+    $outText = $proc.StandardOutput.ReadToEnd()
+    $errText = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+    $code = [int]$proc.ExitCode
+    try { [IO.File]::WriteAllText($stdout,$outText,(New-Object Text.UTF8Encoding($false))) } catch {}
+    try { [IO.File]::WriteAllText($stderr,$errText,(New-Object Text.UTF8Encoding($false))) } catch {}
+    $errTail = ''
+    try { if(Test-Path $stderr){ $errTail = ((Get-Content $stderr -Tail 8 -ErrorAction SilentlyContinue) -join ' ') } } catch {}
+    if($code -ne 0 -and $errTail){ Write-SpiderLog "$cmd failed exit=$code stderr=$errTail" 'ERROR' }
     Sync-SpiderLiveApproval
     $health = $null
-    $summary = "exit=$code"
+    $summary = "exit=$code"; if($errTail){$summary += " | $errTail"}
     $rep = Join-Path $script:SpiderRoot 'Data\last_report.json'
     if (Test-Path $rep) {
         try {

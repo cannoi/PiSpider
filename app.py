@@ -277,11 +277,19 @@ def home():
 @app.get("/api/status")
 def api_status():
     hb = result = cmd = pending = {}
-    for d in bus_dirs():
-        hb = hb or read_json(d / "heartbeat.json") or {}
-        result = result or read_json(d / "result.json") or {}
-        cmd = cmd or read_json(d / "command.json") or {}
-        pending = pending or read_json(d / "pending_approval.json") or {}
+    def newest_json(name):
+        best = {}
+        best_ts = ""
+        for d in all_bus_dirs():
+            item = read_json(d / name) or {}
+            ts = str(item.get("At") or item.get("RequestedAt") or item.get("UpdatedAt") or "")
+            if item and (not best or ts > best_ts):
+                best, best_ts = item, ts
+        return best
+    hb = newest_json("heartbeat.json")
+    result = newest_json("result.json")
+    cmd = newest_json("command.json")
+    pending = newest_json("pending_approval.json")
     inst = read_json(data_root() / "install_state.json") or {}
     alive = worker_alive(hb)
     pack = inst.get("WorkerPack") or {}
@@ -311,7 +319,7 @@ def api_status():
 def api_command():
     body = request.get_json(silent=True) or {}
     action = str(body.get("action") or "SCAN").upper()
-    allowed = {"SCAN", "PATROL", "STATUS", "REPAIR", "DIGEST", "APPROVE", "DENY", "ACTIVATE"}
+    allowed = {"RUN", "SCAN", "PATROL", "STATUS", "REPAIR", "DIGEST", "APPROVE", "DENY", "ACTIVATE"}
     if action not in allowed:
         return jsonify({"ok": False, "error": "unknown action"}), 400
     cmd = {
@@ -330,7 +338,7 @@ def api_run():
     """Whitelist only: scan|repair|status|patrol|digest|worker."""
     body = request.get_json(silent=True) or {}
     script = str(body.get("script") or body.get("action") or "scan").strip().lower()
-    allowed = {"scan", "repair", "status", "patrol", "digest", "worker"}
+    allowed = {"run", "scan", "repair", "status", "patrol", "digest", "worker"}
     if script not in allowed:
         return jsonify({"ok": False, "error": "script not allowed"}), 400
     cmd = {
@@ -348,7 +356,7 @@ def api_run():
 @app.post("/api/run-form")
 def api_run_form():
     script = str(request.form.get("script") or "scan").strip().lower()
-    allowed = {"scan", "repair", "status", "patrol", "digest", "worker"}
+    allowed = {"run", "scan", "repair", "status", "patrol", "digest", "worker"}
     if script not in allowed:
         script = "scan"
     write_json(
