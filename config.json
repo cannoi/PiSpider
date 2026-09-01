@@ -1,6 +1,6 @@
 {
   "App": "PiSpider Hybrid Core",
-  "Version": "1.0.2",
+  "Version": "1.1.0",
   "Listen": "0.0.0.0",
   "Port": 18770,
   "GitHub": {
@@ -14,5 +14,5 @@
     "BotToken": "",
     "ChatId": ""
   },
-  "WindowsActivateHint": "Worker is extracted to this SoloHost app folder /WindowsWorker"
+  "WindowsActivateHint": "Start the Windows Worker from the same SoloHost app folder, then verify its fresh heartbeat in the dashboard."
 }

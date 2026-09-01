@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request, redirect
+from flask import Flask, jsonify, render_template, request, redirect, send_file
 
 TZ = timezone(timedelta(hours=7))
 app = Flask(__name__)
@@ -341,22 +341,15 @@ def api_run_form():
 
 @app.post("/api/accept-form")
 def api_accept_form():
-    write_json(data_root() / "terms_accepted.json", {"Accepted": True, "At": now_iso(), "Version": "1.1"})
+    """Accept terms only. Never try to start a Windows process from SoloHost."""
+    write_json(
+        data_root() / "terms_accepted.json",
+        {"Accepted": True, "At": now_iso(), "Version": "2.0"},
+    )
     try:
         ensure_windows_worker()
-        try_start_windows_worker()
     except Exception:
         pass
-    write_json(
-        bus_dir() / "command.json",
-        {
-            "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S"),
-            "Action": "WORKER",
-            "Script": "worker",
-            "RequestedAt": now_iso(),
-            "Source": "terms-form",
-        },
-    )
     return redirect("/")
 
 
@@ -368,82 +361,48 @@ def api_prepare_pack():
     return jsonify({"ok": bool(state.get("Ready")), "pack": state})
 
 
-def try_start_windows_worker() -> dict:
-    """Authorize + signal + start LiveWorker when the host can run PowerShell."""
-    import subprocess
-    import shutil
-
-    wd = worker_dir()
-    flag = bus_dir() / "ACTIVATE_NOW.json"
-    write_json(
-        flag,
-        {"Activate": True, "At": now_iso(), "Source": "terms-accepted"},
-    )
-    write_json(
-        bus_dir() / "command.json",
-        {
-            "Id": "cmd-" + datetime.now(TZ).strftime("%Y%m%d-%H%M%S"),
-            "Action": "SCAN",
-            "RequestedAt": now_iso(),
-            "TimeoutSec": 180,
-            "Source": "terms-accepted",
-        },
-    )
-    (wd / "START_NOW.flag").write_text(now_iso(), encoding="utf-8")
-    cmd = app_root() / "START_PISPIDER_WORKER.cmd"
-    try:
-        cmd.write_text(
-            "@echo off\r\n"
-            "cd /d \"%~dp0WindowsWorker\"\r\n"
-            "start \"\" powershell -NoProfile -ExecutionPolicy Bypass -File \".\\LiveWorker.ps1\"\r\n",
-            encoding="utf-8",
-        )
-    except Exception:
-        pass
-
-    started = False
-    method = "flag-only"
-    err = None
-    ps = shutil.which("powershell") or shutil.which("pwsh")
-    live = wd / "LiveWorker.ps1"
-    if ps and live.is_file():
-        try:
-            subprocess.Popen(
-                [ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(live)],
-                cwd=str(wd),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
-            started = True
-            method = "powershell"
-        except Exception as e:
-            err = str(e)
-    return {"started": started, "method": method, "error": err, "workerDir": str(wd)}
-
-
 @app.post("/api/accept-terms")
 def api_accept_terms():
+    """Terms gate: prepare the worker package, then let the user start it on Windows."""
     body = request.get_json(silent=True) or {}
     if not body.get("accepted"):
         return jsonify({"ok": False, "error": "terms not accepted"}), 400
-    pack = ensure_windows_worker()
+
     write_json(
         data_root() / "terms_accepted.json",
-        {"Accepted": True, "At": now_iso(), "Version": "1.0"},
+        {"Accepted": True, "At": now_iso(), "Version": "2.0"},
     )
-    launch = try_start_windows_worker()
-    pack["Activated"] = True
-    pack["ActivationRequested"] = True
-    pack["ActivationRequestedAt"] = now_iso()
-    pack["Launch"] = launch
-    write_json(data_root() / "install_state.json", {"WorkerPack": pack})
-    hint = (
-        "Worker start signal written."
-        if launch.get("started")
-        else "Pack is in data/WindowsWorker. If this SoloHost is Linux, run Activate_Worker.bat once on the Windows Node PC — after that, terms-accept will start it via the bus."
+    pack = ensure_windows_worker()
+    return jsonify(
+        {
+            "ok": True,
+            "termsAccepted": True,
+            "pack": pack,
+            "next": "worker-setup",
+            "message": "Terms accepted. Start the Windows Worker using one of the methods shown.",
+        }
     )
-    return jsonify({"ok": True, "pack": pack, "launch": launch, "hint": hint})
+
+
+@app.get("/api/worker-check")
+def api_worker_check():
+    """Read-only verification. A worker is active only when a fresh heartbeat exists."""
+    hb = result = {}
+    for d in bus_dirs():
+        hb = hb or read_json(d / "heartbeat.json") or {}
+        result = result or read_json(d / "result.json") or {}
+    alive = worker_alive(hb)
+    return jsonify(
+        {
+            "ok": True,
+            "workerAlive": alive,
+            "workerBusy": bool(hb.get("Busy")),
+            "heartbeat": hb,
+            "lastResult": result,
+            "verifiedAt": now_iso(),
+            "verification": "PASS" if alive else "WAITING",
+        }
+    )
 
 
 @app.post("/api/activate")
@@ -467,10 +426,18 @@ def api_activate():
         },
     )
     hint = (
-        "WindowsWorker is in SoloHost folder data/WindowsWorker. "
-        "Copy it to the Windows Node PC and run Activate_Worker.bat"
+        "Copy/run the Worker on the Windows Node PC, then wait for a fresh heartbeat. "
+        "SoloHost does not start Windows processes from the container."
     )
     return jsonify({"ok": True, "pack": pack, "hint": hint})
+
+
+@app.get("/windows-worker.zip")
+def download_worker_zip():
+    p = bundled_zip()
+    if not p or not p.is_file():
+        return jsonify({"ok": False, "error": "Windows Worker package not available"}), 404
+    return send_file(p, as_attachment=True, download_name="windows-worker.zip")
 
 
 @app.get("/health")

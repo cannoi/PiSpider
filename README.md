@@ -2,6 +2,18 @@
 
 Dashboard for PiSpider on SoloHost. Windows Worker stays on the Node PC.
 
+## First-run flow
+
+The dashboard intentionally uses a simple three-stage flow:
+
+1. **Terms** — explains that PiSpider has a SoloHost dashboard and a Windows Worker.
+2. **Worker setup** — gives several Windows start methods (double-click, PowerShell, CMD, fallback `.bat`).
+3. **Verification** — waits for a fresh Worker heartbeat before opening the normal PiSpider dashboard.
+
+SoloHost does **not** attempt to launch a Windows PowerShell process from inside its container. This avoids a false "installed/started" state and makes the final verification real.
+
+See `ONBOARDING.md` for the same instructions in text form.
+
 ## Publish
 
 ```bash

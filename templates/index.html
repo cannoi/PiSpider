@@ -1,102 +1,184 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>PiSpider</title>
-  <style>
-    body { font-family: Segoe UI, sans-serif; background:#f4f5f7; color:#222; margin:0; }
-    .wrap { max-width:740px; margin:0 auto; padding:16px; }
-    button { font-size:16px; padding:12px 16px; margin:4px 4px 4px 0; border:0; border-radius:8px; cursor:pointer; }
-    .go { background:#1e7850; color:#fff; width:100%; font-weight:700; }
-    .sec { background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin:12px 0; }
-    pre { white-space:pre-wrap; font-size:13px; }
-    form { display:inline; }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>PiSpider Hybrid</title>
+<style>
+:root{font-family:Segoe UI,system-ui,sans-serif;color:#1f2937;background:#f4f6f8}
+*{box-sizing:border-box} body{margin:0}.wrap{max-width:900px;margin:auto;padding:20px}
+.card{background:#fff;border:1px solid #dfe3e8;border-radius:14px;padding:20px;margin:14px 0;box-shadow:0 2px 8px #0000000a}
+h1{margin:0 0 8px;font-size:30px}h2{margin:0 0 10px}h3{margin:18px 0 8px}
+.muted{color:#667085}.ok{color:#087443}.warn{color:#a15c00}.bad{color:#b42318}
+button{border:0;border-radius:9px;padding:12px 16px;font-size:15px;font-weight:650;cursor:pointer;margin:5px 5px 5px 0}
+.primary{background:#176b4d;color:#fff}.secondary{background:#eef1f4}.danger{background:#b42318;color:#fff}
+pre{white-space:pre-wrap;overflow:auto;background:#f7f8fa;border-radius:9px;padding:12px;font-size:13px;line-height:1.5}
+.code{user-select:all}.step{display:flex;gap:12px;margin:12px 0}.num{min-width:30px;height:30px;border-radius:50%;background:#e8f2ee;display:grid;place-items:center;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.metric{padding:14px;background:#f7f8fa;border-radius:10px}
+.hidden{display:none}.status{font-weight:700}
+@media(max-width:650px){.grid{grid-template-columns:1fr}.wrap{padding:12px}}
+</style>
 </head>
 <body>
 <div class="wrap">
-  <h1>PiSpider</h1>
-  <p>This app has two parts. SoloHost is the panel. Windows Worker does the Node work on this PC.</p>
+<header class="card">
+  <h1>PiSpider Hybrid</h1>
+  <p class="muted">SoloHost is the dashboard. Windows Worker does the Pi Node work on the Windows PC.</p>
+</header>
 
-  <div class="sec">
-    <b>TWO PARTS — TERMS</b>
-<pre>What this is
-PiSpider is one product in two parts on YOUR computer:
-1) SoloHost panel (this page) — status, buttons, terms.
-2) Windows Worker — PowerShell that reads Docker / Pi Node on Windows.
+<section id="terms" class="card">
+  <h2>Before you start</h2>
+  <p><b>PiSpider has 2 parts:</b></p>
+  <div class="step"><div class="num">1</div><div><b>SoloHost</b><br><span class="muted">The web dashboard: status, commands and results.</span></div></div>
+  <div class="step"><div class="num">2</div><div><b>Windows Worker</b><br><span class="muted">A PowerShell worker running on the Windows PC that has Pi Node / Docker.</span></div></div>
+  <div class="card">
+    <b>Simple terms</b>
+    <ul>
+      <li>The Worker can read Windows, Docker and Pi Node status.</li>
+      <li>The dashboard sends only predefined commands such as Scan, Status, Patrol and Repair.</li>
+      <li>No Pi wallet, passphrase or private key is requested.</li>
+      <li>SoloHost cannot directly start a Windows program from inside its container. You start the Worker on Windows.</li>
+    </ul>
+  </div>
+  <button class="primary" id="accept">I AGREE — CONTINUE</button>
+  <span id="acceptMsg" class="muted"></span>
+</section>
 
-The panel does not repair the Node by itself. The Worker does.
+<section id="setup" class="hidden">
+  <div class="card">
+    <h2>Step 2 — Start the Windows Worker</h2>
+    <p>Use <b>one</b> method below. The first method is easiest.</p>
 
-What is ON by default
-SoloHost sandbox only: this page, the app folder, localhost port 18770.
-The Worker runs only after you start it on Windows.
+    <h3>Method A — double-click</h3>
+    <p>Open the PiSpider SoloHost app folder on Windows and double-click:</p>
+    <pre class="code">Start-Worker.cmd</pre>
 
-What you grant if you Confirm
-• The Worker may read Node / Docker / disk status on this Windows PC.
-• The panel may send only whitelist commands: scan, repair, status, patrol.
-• No random PowerShell from the browser.
+    <h3>Method B — PowerShell</h3>
+    <p>Open PowerShell <b>in the PiSpider app folder</b>:</p>
+    <pre class="code">powershell -NoProfile -ExecutionPolicy Bypass -File ".\WindowsWorker\LiveWorker.ps1"</pre>
 
-What we do not claim
-• No access to your Pi wallet or keys.
-• No Docker socket unless you enable that separately.
-• Publisher does not operate your PC.
+    <h3>Method C — CMD</h3>
+    <p>Open CMD <b>in the PiSpider app folder</b>:</p>
+    <pre class="code">powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\WindowsWorker\LiveWorker.ps1"</pre>
 
-Your responsibility
-You start and stop the Windows Worker. You can delete the WindowsWorker folder anytime.
+    <h3>Method D — download the Worker package</h3>
+    <p>If the Worker files are missing on Windows, download the package, extract it into the SoloHost app folder, then run:</p>
+    <p><a href="/windows-worker.zip"><button class="secondary" type="button">DOWNLOAD WINDOWS WORKER</button></a></p>
+    <pre class="code">.\WindowsWorker\Activate_Worker.bat</pre>
 
-After Confirm
-Click START WINDOWS WORKER (or run Start-Worker.cmd in this app folder).
-Then use SCAN / STATUS / REPAIR on this page.
-
-Confirm only if you accept these terms in full.</pre>
-    <form method="post" action="/api/accept-form">
-      <button class="go" type="submit">I CONFIRM — START</button>
-    </form>
+    <p class="warn"><b>Important:</b> Do not run two Worker windows at the same time. Keep one Worker window open while testing.</p>
   </div>
 
-  <div class="sec">
-    <b>Windows Worker</b>
-    <p>One file in the SoloHost app folder: <code>Start-Worker.cmd</code>. Double-click it. A PowerShell window opens and the Worker stays on.</p>
-    <form method="post" action="/api/run-form"><input type="hidden" name="script" value="worker"><button class="go" type="submit">START WINDOWS WORKER</button></form>
-    <p><a href="/Activate_Worker.bat">Download Activate_Worker.bat</a></p>
+  <div class="card">
+    <h2>Step 3 — Check that it really works</h2>
+    <p>After starting the Worker, wait about 5–15 seconds and press:</p>
+    <button class="primary" id="check">CHECK WORKER</button>
+    <div id="verify" class="status">Not checked yet.</div>
+    <pre id="verifyDetail"></pre>
+    <p class="muted">PASS means SoloHost has received a fresh Worker heartbeat. That is the actual installation check — not just a file being present.</p>
   </div>
 
-  <div class="sec">
-    <form method="post" action="/api/run-form"><input type="hidden" name="script" value="scan"><button type="submit">SCAN</button></form>
-    <form method="post" action="/api/run-form"><input type="hidden" name="script" value="status"><button type="submit">STATUS</button></form>
-    <form method="post" action="/api/run-form"><input type="hidden" name="script" value="repair"><button type="submit">REPAIR</button></form>
-    <form method="post" action="/api/run-form"><input type="hidden" name="script" value="patrol"><button type="submit">PATROL</button></form>
+  <div class="card">
+    <h3>If PASS does not appear</h3>
+    <ol>
+      <li>Make sure the PowerShell/Worker window is still open.</li>
+      <li>Run the command from the <b>same SoloHost app folder</b> that contains <code>WindowsWorker</code>.</li>
+      <li>Wait 15 seconds and check again.</li>
+      <li>If PowerShell blocks scripts, use the commands above with <code>-ExecutionPolicy Bypass</code>.</li>
+      <li>If you moved only the Worker folder to another location, put it back under the SoloHost app folder so the shared <code>Data\live</code> bus can be seen by SoloHost.</li>
+    </ol>
   </div>
+</section>
 
-  <div class="sec"><b>NOW / DONE / NEXT</b><pre id="story">Open this page to refresh status. Buttons above work without extra clicks.</pre></div>
+<section id="dashboard" class="hidden">
+  <div class="card">
+    <h2>PiSpider Dashboard</h2>
+    <div class="grid">
+      <div class="metric"><b>Worker</b><div id="workerState">—</div></div>
+      <div class="metric"><b>Activity</b><div id="activity">—</div></div>
+      <div class="metric"><b>Last action</b><div id="lastAction">—</div></div>
+      <div class="metric"><b>Last result</b><div id="lastResult">—</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>NOW / DONE / NEXT</h3>
+    <pre id="story">Loading…</pre>
+  </div>
+  <div class="card">
+    <h3>Actions</h3>
+    <button class="primary" data-action="SCAN">SCAN</button>
+    <button class="secondary" data-action="STATUS">STATUS</button>
+    <button class="secondary" data-action="PATROL">PATROL</button>
+    <button class="danger" data-action="REPAIR">REPAIR</button>
+    <p id="actionMsg" class="muted"></p>
+  </div>
+</section>
 </div>
+
 <script>
-const BASES = ['', 'http://127.0.0.1:18770'];
-async function api(path){
-  for (const b of BASES){
-    try { const r = await fetch(b+path); if (r.ok) return r.json(); } catch(e){}
-  }
-  return null;
+async function api(path, options={}){
+  try{
+    const r=await fetch(path,{cache:'no-store',...options});
+    const j=await r.json();
+    return r.ok?j:null;
+  }catch(e){return null}
 }
-async function refresh(){
-  const r = await api('/api/status');
-  if (!r) { document.getElementById('story').textContent = 'Panel API not reached. Open http://127.0.0.1:18770/'; return; }
-  const res = r.lastResult || {}, cmd = r.lastCommand || {};
-  document.getElementById('story').textContent = [
+const $=id=>document.getElementById(id);
+
+function showStage(){
+  api('/api/status').then(r=>{
+    if(!r)return;
+    if(!r.termsAccepted){$('terms').classList.remove('hidden');$('setup').classList.add('hidden');$('dashboard').classList.add('hidden');return;}
+    if(!r.workerAlive){$('terms').classList.add('hidden');$('setup').classList.remove('hidden');$('dashboard').classList.add('hidden');return;}
+    $('terms').classList.add('hidden');$('setup').classList.add('hidden');$('dashboard').classList.remove('hidden');
+    render(r);
+  });
+}
+function render(r){
+  const hb=r.heartbeat||{}, res=r.lastResult||{}, cmd=r.lastCommand||{};
+  $('workerState').textContent=r.workerAlive?'ON':'OFF';
+  $('workerState').className=r.workerAlive?'ok':'bad';
+  $('activity').textContent=hb.Busy?'Working: '+(hb.Note||'action'):'Idle';
+  $('lastAction').textContent=res.Action||'—';
+  $('lastResult').textContent=res.Status?res.Status+' — '+(res.Summary||''):'No result yet';
+  $('story').textContent=[
     '=== NOW ===',
-    r.workerAlive ? ('Worker ON  ' + (r.heartbeat && r.heartbeat.Note || '')) : 'Worker OFF — run Start-Worker.cmd',
-    'Bus: ' + (r.busPath||''),
+    r.workerAlive?'Worker ON — '+(hb.Note||'idle'):'Worker OFF',
+    'Heartbeat: '+(hb.At||'—'),
     '',
     '=== DONE ===',
-    res.Action ? (res.Action + ' ' + (res.Summary||'') + ' ' + (res.At||'')) : 'No result file yet',
+    res.Action?(res.Action+' | '+(res.Status||'')+' | '+(res.Summary||'')+' | '+(res.At||'')):'No completed action yet',
     '',
     '=== NEXT ===',
-    cmd.Action ? ('Queued ' + cmd.Action) : 'Press SCAN'
-  ].join('\n');
+    cmd.Action?('Queued: '+cmd.Action):'Ready — press SCAN or STATUS'
+  ].join('\\n');
 }
-refresh();
-setInterval(refresh, 5000);
+$('accept').onclick=async()=>{
+  $('accept').disabled=true;$('acceptMsg').textContent='Saving…';
+  const r=await api('/api/accept-terms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accepted:true})});
+  if(r&&r.ok){$('acceptMsg').textContent='Done. Continue below.';showStage();}
+  else{$('accept').disabled=false;$('acceptMsg').textContent='Could not save. Please try again.';}
+};
+$('check').onclick=async()=>{
+  $('check').disabled=true;
+  const r=await api('/api/worker-check');
+  if(r&&r.workerAlive){
+    $('verify').textContent='✓ WORKER VERIFIED — opening dashboard…';$('verify').className='status ok';
+    $('verifyDetail').textContent='Heartbeat: '+(r.heartbeat.At||'—')+'\\nPID: '+(r.heartbeat.Pid||'—')+'\\nNote: '+(r.heartbeat.Note||'idle');
+    setTimeout(showStage,500);
+  }else{
+    $('verify').textContent='Worker not detected yet.';$('verify').className='status warn';
+    $('verifyDetail').textContent='Start the Worker using one method above, wait 5–15 seconds, then check again.';
+  }
+  $('check').disabled=false;
+};
+document.querySelectorAll('[data-action]').forEach(b=>b.onclick=async()=>{
+  const a=b.dataset.action;b.disabled=true;$('actionMsg').textContent='Sending '+a+'…';
+  const r=await api('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a})});
+  $('actionMsg').textContent=r&&r.ok?'Queued '+a+'.':'Could not queue '+a+'.';
+  b.disabled=false;setTimeout(showStage,500);
+});
+showStage();setInterval(showStage,5000);
 </script>
 </body>
 </html>
