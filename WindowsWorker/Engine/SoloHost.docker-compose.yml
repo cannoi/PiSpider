@@ -1,6 +1,7 @@
 # PiSpider Hybrid — SoloHost
-# pi.ui.primary = Dashboard inside SoloHost
-# One WindowsWorker at app root. Bus = WindowsWorker/Data/live
+# Do NOT mount ./config.json as a file. SoloHost sometimes creates a FOLDER
+# named config.json; that breaks Docker (mount directory onto file).
+# Config is written to ./data/pispider-config.json instead.
 
 services:
   pispider-core:
@@ -12,13 +13,13 @@ services:
     ports:
       - "127.0.0.1:18770:18770"
     volumes:
-      - ./config.json:/app/config.json:ro
       - ./data:/data
       - ./:/solohost-config:rw
     environment:
-      PISPIDER_CONFIG: /app/config.json
+      PISPIDER_CONFIG: /data/pispider-config.json
       PISPIDER_DATA: /data
       SOLOHOST_CONFIG: /solohost-config
+      WINDOWS_UI: http://host.docker.internal:18771
       TZ: Asia/Ho_Chi_Minh
     extra_hosts:
       - "host.docker.internal:host-gateway"

@@ -57,7 +57,3 @@ When the packaged canonical SoloHost compose differs from the app's `docker-comp
 The dashboard renders its shell immediately and hydrates status in the background. After the first verified session, the dashboard shell can appear without waiting for the full status payload; the server remains authoritative and will return to Worker setup if verification is lost.
 
 The Windows Worker does not read the protected Pi Desktop `config.json` just to discover the SoloHost port. It uses the known localhost ports 18770/18780 (or `PISPIDER_SOLOHOST_PORT`) to avoid `GetContentReaderUnauthorizedAccessError`.
-
-
-## v1.6.0 — Windows Dashboard streamed through SoloHost
-The Windows Worker keeps its existing engine and data flow. Its dashboard is now served locally on 127.0.0.1:18888 and SoloHost proxies that same UI at /worker-dashboard/. The Windows dashboard is therefore the single source of UI truth; commands and live telemetry continue to use the existing LiveBus.

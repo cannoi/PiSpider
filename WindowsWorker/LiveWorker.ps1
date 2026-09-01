@@ -3,7 +3,7 @@
 # Reads Data\live\command.json written by SoloHost Core
 [CmdletBinding()]
 param(
-    [int]$PollSeconds = 2,
+    [int]$PollSeconds = 15,
     [switch]$Once
 )
 
@@ -17,10 +17,10 @@ try {
     $id=[Security.Principal.WindowsIdentity]::GetCurrent()
     $pr=New-Object Security.Principal.WindowsPrincipal($id)
     if (-not $pr.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        $args='-NoProfile -ExecutionPolicy Bypass -File "'+$MyInvocation.MyCommand.Path+'"'
+        $args='-NoProfile -ExecutionPolicy Bypass -File +$MyInvocation.MyCommand.Path+'
         if($PollSeconds){$args+=' -PollSeconds '+$PollSeconds}
         if($Once){$args+=' -Once'}
-        Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -Verb RunAs -ArgumentList $args -WindowStyle Hidden | Out-Null
+        Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -Verb RunAs -ArgumentList $args | Out-Null
         Write-Host '[WORKER] Administrator permission requested. The elevated Worker will continue.' -ForegroundColor Yellow
         exit 0
     }
@@ -115,23 +115,6 @@ function Get-CoreHeartbeatUrls {
     }
 }
 
-function Send-CoreEvent {
-    param([string]$Type, [hashtable]$Payload)
-    $body = [ordered]@{ Type=$Type; Pack='windows-worker' }
-    foreach($k in $Payload.Keys){ $body[$k]=$Payload[$k] }
-    $json = $body | ConvertTo-Json -Depth 8 -Compress
-    foreach ($uri in (Get-CoreEventUrls)) {
-        try { Invoke-RestMethod -Uri $uri -Method Post -ContentType 'application/json' -Body $json -TimeoutSec 1 -ErrorAction Stop | Out-Null; break } catch {}
-    }
-}
-function Get-CoreEventUrls {
-    $ports = New-Object System.Collections.Generic.List[int]
-    $envPort=0; try{$envPort=[int]$env:PISPIDER_SOLOHOST_PORT}catch{}
-    if($envPort -gt 0){[void]$ports.Add($envPort)}
-    foreach($port in @(18770,18780)){if(-not $ports.Contains($port)){[void]$ports.Add($port)}}
-    foreach($port in $ports){ "http://127.0.0.1:$port/api/worker-event" }
-}
-
 function Send-CoreHeartbeat {
     param([bool]$Busy = $false, [string]$Note = '')
     # File LiveBus remains the primary channel. Localhost HTTP is a second path so
@@ -148,31 +131,16 @@ function Send-CoreHeartbeat {
     $json = $payload | ConvertTo-Json -Depth 5 -Compress
     foreach ($uri in (Get-CoreHeartbeatUrls)) {
         try {
-            Invoke-RestMethod -Uri $uri -Method Post -ContentType 'application/json' -Body $json -TimeoutSec 1 -ErrorAction Stop | Out-Null
+            Invoke-RestMethod -Uri $uri -Method Post -ContentType 'application/json' -Body $json -TimeoutSec 3 -ErrorAction Stop | Out-Null
             break
         } catch { }
     }
-    try { Send-CoreEvent -Type 'HEARTBEAT' -Payload @{Alive=$true;Busy=$Busy;At=$payload.At;Note=$Note;Pid=$PID;Root=$script:SpiderRoot} } catch {}
 }
 
 function Write-WorkerHeartbeat {
     param([bool]$Busy = $false, [string]$Note = '')
     Write-SpiderLiveHeartbeat -Busy $Busy -Note $Note
     Send-CoreHeartbeat -Busy $Busy -Note $Note
-}
-
-function Write-WorkerProgress {
-    param([string]$Action,[string]$Phase,[string]$Detail='',[int]$Percent=0)
-    $at=(Get-Date).ToString('o'); $obj=[ordered]@{Action=$Action;Phase=$Phase;Detail=$Detail;Percent=$Percent;At=$at;Pid=$PID}
-    try { Write-SpiderLiveJson -Name 'worker_progress.json' -Object $obj } catch {}
-    try { Send-CoreEvent -Type 'PROGRESS' -Payload @{Action=$Action;Phase=$Phase;Detail=$Detail;Percent=$Percent;At=$at;Pid=$PID} } catch {}
-    try { Send-CoreEvent -Type 'LOG' -Payload @{Action=$Action;Level='INFO';Message=("$Phase | $Detail | $Percent%");At=$at;Pid=$PID} } catch {}
-}
-function Write-WorkerState {
-    param([bool]$Active=$true,[string]$Mode='AUTO',[string]$Note='')
-    $at=(Get-Date).ToString('o'); $obj=[ordered]@{Active=$Active;Mode=$Mode;Note=$Note;At=$at;Pid=$PID}
-    try { Write-SpiderLiveJson -Name 'worker_state.json' -Object $obj } catch {}
-    try { Send-CoreEvent -Type 'STATE' -Payload @{Active=$Active;Mode=$Mode;Note=$Note;At=$at;Pid=$PID} } catch {}
 }
 
 function Invoke-LiveAction {
@@ -192,7 +160,6 @@ function Invoke-LiveAction {
         return
     }
     Write-WorkerHeartbeat -Busy $true -Note $cmd
-    Write-WorkerProgress -Action $Action -Phase 'RUNNING' -Detail 'Executing PiNodeSpider' -Percent 10
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $stdout = Join-Path $script:SpiderRoot 'Data\live\worker.stdout.log'
     $stderr = Join-Path $script:SpiderRoot 'Data\live\worker.stderr.log'
@@ -207,14 +174,11 @@ function Invoke-LiveAction {
     $psi.RedirectStandardError = $true
     $proc = New-Object System.Diagnostics.Process
     $proc.StartInfo = $psi
-    Write-WorkerProgress -Action $Action -Phase 'STARTED' -Detail 'PiNodeSpider process started' -Percent 20
     [void]$proc.Start()
-    Write-WorkerProgress -Action $Action -Phase 'EXECUTING' -Detail 'Waiting for result' -Percent 50
     $outText = $proc.StandardOutput.ReadToEnd()
     $errText = $proc.StandardError.ReadToEnd()
     $proc.WaitForExit()
     $code = [int]$proc.ExitCode
-    Write-WorkerProgress -Action $Action -Phase 'VERIFYING' -Detail ('Exit code '+$code) -Percent 85
     try { [IO.File]::WriteAllText($stdout,$outText,(New-Object Text.UTF8Encoding($false))) } catch {}
     try { [IO.File]::WriteAllText($stderr,$errText,(New-Object Text.UTF8Encoding($false))) } catch {}
     $errTail = ''
@@ -231,17 +195,11 @@ function Invoke-LiveAction {
             if ($j.Decision.Action) { $summary = "decision=$($j.Decision.Action) health=$health" }
         } catch {}
     }
-    $finalStatus = if ($code -eq 0) { 'OK' } else { 'FAIL' }
-    Write-SpiderLiveResult -Action $Action -Status $finalStatus -Summary $summary -Health $health
-    try { Send-CoreEvent -Type 'RESULT' -Payload @{Action=$Action;Status=$finalStatus;Summary=$summary;Health=$health;At=(Get-Date).ToString('o');Pid=$PID} } catch {}
-    Write-WorkerProgress -Action $Action -Phase 'DONE' -Detail $summary -Percent 100
+    Write-SpiderLiveResult -Action $Action -Status $(if ($code -eq 0) { 'OK' } else { 'FAIL' }) -Summary $summary -Health $health
     Write-WorkerHeartbeat -Busy $false -Note 'idle'
-    Write-WorkerState -Active $true -Mode 'AUTO' -Note 'idle'
 }
 
-try { Send-CoreEvent -Type 'LOG' -Payload @{Action='WORKER';Level='INFO';Message='Windows Worker online; AUTO polling started';At=(Get-Date).ToString('o');Pid=$PID} } catch {}
 Write-WorkerHeartbeat -Busy $false -Note 'waiting'
-Write-WorkerState -Active $true -Mode 'AUTO' -Note 'waiting'
 $lastId = ''
 while ($true) {
     try {
@@ -249,7 +207,6 @@ while ($true) {
         $cmd = Read-SpiderLiveCommand
         if ($cmd -and $cmd.Id -and $cmd.Id -ne $lastId) {
             $act = ([string]$cmd.Action).ToUpper()
-            Write-WorkerProgress -Action $act -Phase 'RECEIVED' -Detail 'Command received from SoloHost' -Percent 5
             if ($act -in @('APPROVE','DENY')) {
                 $pending = Join-Path $script:SpiderRoot 'Data\pending_approval.json'
                 if (Test-Path $pending) {
@@ -274,5 +231,5 @@ while ($true) {
         Write-Host "[WORKER] $($_.Exception.Message)"
     }
     if ($Once) { break }
-    Start-Sleep -Seconds ([Math]::Max(2, $PollSeconds))
+    Start-Sleep -Seconds ([Math]::Max(5, $PollSeconds))
 }
