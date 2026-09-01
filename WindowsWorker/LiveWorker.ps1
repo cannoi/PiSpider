@@ -17,10 +17,10 @@ try {
     $id=[Security.Principal.WindowsIdentity]::GetCurrent()
     $pr=New-Object Security.Principal.WindowsPrincipal($id)
     if (-not $pr.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        $args='-NoProfile -ExecutionPolicy Bypass -File +$MyInvocation.MyCommand.Path+'
+        $args='-NoProfile -ExecutionPolicy Bypass -File "'+$MyInvocation.MyCommand.Path+'"'
         if($PollSeconds){$args+=' -PollSeconds '+$PollSeconds}
         if($Once){$args+=' -Once'}
-        Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -Verb RunAs -ArgumentList $args | Out-Null
+        Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -Verb RunAs -ArgumentList $args -WindowStyle Hidden | Out-Null
         Write-Host '[WORKER] Administrator permission requested. The elevated Worker will continue.' -ForegroundColor Yellow
         exit 0
     }
@@ -143,6 +143,15 @@ function Write-WorkerHeartbeat {
     Send-CoreHeartbeat -Busy $Busy -Note $Note
 }
 
+function Write-WorkerProgress {
+    param([string]$Action,[string]$Phase,[string]$Detail='',[int]$Percent=0)
+    try { Write-SpiderLiveJson -Name 'worker_progress.json' -Object ([ordered]@{Action=$Action;Phase=$Phase;Detail=$Detail;Percent=$Percent;At=(Get-Date).ToString('o');Pid=$PID}) } catch {}
+}
+function Write-WorkerState {
+    param([bool]$Active=$true,[string]$Mode='AUTO',[string]$Note='')
+    try { Write-SpiderLiveJson -Name 'worker_state.json' -Object ([ordered]@{Active=$Active;Mode=$Mode;Note=$Note;At=(Get-Date).ToString('o');Pid=$PID}) } catch {}
+}
+
 function Invoke-LiveAction {
     param([string]$Action)
     $map = @{
@@ -160,6 +169,7 @@ function Invoke-LiveAction {
         return
     }
     Write-WorkerHeartbeat -Busy $true -Note $cmd
+    Write-WorkerProgress -Action $Action -Phase 'RUNNING' -Detail 'Executing PiNodeSpider' -Percent 10
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $stdout = Join-Path $script:SpiderRoot 'Data\live\worker.stdout.log'
     $stderr = Join-Path $script:SpiderRoot 'Data\live\worker.stderr.log'
@@ -174,11 +184,14 @@ function Invoke-LiveAction {
     $psi.RedirectStandardError = $true
     $proc = New-Object System.Diagnostics.Process
     $proc.StartInfo = $psi
+    Write-WorkerProgress -Action $Action -Phase 'STARTED' -Detail 'PiNodeSpider process started' -Percent 20
     [void]$proc.Start()
+    Write-WorkerProgress -Action $Action -Phase 'EXECUTING' -Detail 'Waiting for result' -Percent 50
     $outText = $proc.StandardOutput.ReadToEnd()
     $errText = $proc.StandardError.ReadToEnd()
     $proc.WaitForExit()
     $code = [int]$proc.ExitCode
+    Write-WorkerProgress -Action $Action -Phase 'VERIFYING' -Detail ('Exit code '+$code) -Percent 85
     try { [IO.File]::WriteAllText($stdout,$outText,(New-Object Text.UTF8Encoding($false))) } catch {}
     try { [IO.File]::WriteAllText($stderr,$errText,(New-Object Text.UTF8Encoding($false))) } catch {}
     $errTail = ''
@@ -196,10 +209,13 @@ function Invoke-LiveAction {
         } catch {}
     }
     Write-SpiderLiveResult -Action $Action -Status $(if ($code -eq 0) { 'OK' } else { 'FAIL' }) -Summary $summary -Health $health
+    Write-WorkerProgress -Action $Action -Phase 'DONE' -Detail $summary -Percent 100
     Write-WorkerHeartbeat -Busy $false -Note 'idle'
+    Write-WorkerState -Active $true -Mode 'AUTO' -Note 'idle'
 }
 
 Write-WorkerHeartbeat -Busy $false -Note 'waiting'
+Write-WorkerState -Active $true -Mode 'AUTO' -Note 'waiting'
 $lastId = ''
 while ($true) {
     try {
@@ -207,6 +223,7 @@ while ($true) {
         $cmd = Read-SpiderLiveCommand
         if ($cmd -and $cmd.Id -and $cmd.Id -ne $lastId) {
             $act = ([string]$cmd.Action).ToUpper()
+            Write-WorkerProgress -Action $act -Phase 'RECEIVED' -Detail 'Command received from SoloHost' -Percent 5
             if ($act -in @('APPROVE','DENY')) {
                 $pending = Join-Path $script:SpiderRoot 'Data\pending_approval.json'
                 if (Test-Path $pending) {

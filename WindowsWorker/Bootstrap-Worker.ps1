@@ -40,16 +40,11 @@ $env:PINODE_SPIDER_ROOT = $workerRoot
 Write-Host "[BOOT] PiSpider Worker found: $workerRoot" -ForegroundColor Green
 Write-Host "[BOOT] SoloHost app root: $appRoot"
 
-$ui = Join-Path $workerRoot 'WorkerDashboard.ps1'
 $live = Join-Path $workerRoot 'LiveWorker.ps1'
+$gui = Join-Path $workerRoot 'WorkerDashboard.ps1'
+if (-not (Test-Path -LiteralPath $gui)) { throw "WorkerDashboard.ps1 not found: $gui" }
+Write-Host '[BOOT] Starting PiSpider Worker Dashboard...' -ForegroundColor Cyan
 $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (Test-Path -LiteralPath $ui) {
-    Write-Host '[BOOT] Opening Worker dashboard (consoles stay hidden)...' -ForegroundColor Cyan
-    Start-Process -FilePath $ps -ArgumentList @('-STA','-NoProfile','-ExecutionPolicy','Bypass','-File', $ui) | Out-Null
-    exit 0
-}
-$args = @('-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File',$live)
-if ($Once) { $args += '-Once' }
-Write-Host '[BOOT] Dashboard missing — starting hidden LiveWorker.' -ForegroundColor Yellow
-Start-Process -FilePath $ps -ArgumentList $args -WindowStyle Hidden | Out-Null
+$arg = '-NoProfile -ExecutionPolicy Bypass -File "' + $gui + '" -WorkerRoot "' + $workerRoot + '"'
+Start-Process -FilePath $ps -ArgumentList $arg -WorkingDirectory $workerRoot -WindowStyle Hidden | Out-Null
 exit 0

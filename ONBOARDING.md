@@ -76,3 +76,9 @@ When the canonical SoloHost compose file differs, the Worker creates a timestamp
 
 If the Worker prints `Access to ...\config.json is denied`, do not change Windows permissions.
 Current Worker versions do not need to read that protected file. Replace the Worker package with the current package and start it again. The Worker uses the SoloHost localhost ports (18770, 18780) and can also use `PISPIDER_SOLOHOST_PORT` when explicitly configured.
+
+## Windows Worker Dashboard
+
+After `Start-Worker.cmd` or `Activate_Worker.bat`, the command window is hidden. A simple Windows dashboard opens and runs elevated through UAC. It shows Worker state, AUTO mode, current progress, SoloHost commands, results/errors and essential settings.
+
+Do not close the dashboard if you want the normal operator view. The Worker itself continues in the background.
